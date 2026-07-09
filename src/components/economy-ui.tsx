@@ -6,7 +6,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { usePrefersReduced } from "@/lib/use-reduced";
-import type { Bounty, RankInfo, ResolveResult, Seal, SealRarity } from "@/lib/types";
+import type { Achievement, Bounty, PersonalRecords, RankInfo, ResolveResult, Seal, SealRarity } from "@/lib/types";
+import { ECON } from "@/lib/economy";
 import { Button, Card, Label } from "./ui";
 import { CountUp } from "./charts";
 
@@ -146,12 +147,15 @@ export function ResolveCard({
   balanceAfter,
   onCollect,
   line,
+  shieldBurn,
 }: {
   result: ResolveResult;
   balanceAfter: number;
   onCollect: () => void;
   /** Optional hard line — shown on failed verdicts only. */
   line?: string;
+  /** A held shield burns on this failure: the chain survives. */
+  shieldBurn?: boolean;
 }) {
   const reduced = usePrefersReduced();
   const verdictTone =
@@ -186,6 +190,12 @@ export function ResolveCard({
           <Row label="execution" value={`+${result.executionPay}`} />
           <Row label="calibration" value={`+${result.calibrationBonus}`} />
           <Row label="momentum" value={`×${result.momentum.toFixed(1)}`} />
+          {shieldBurn && (
+            <div className="flex items-center justify-between gap-3" style={{ color: "var(--gold)" }}>
+              <span>shield</span>
+              <span>burned — the chain holds</span>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 border-t border-line pt-4 text-center">
@@ -217,6 +227,176 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-muted">{label}</span>
       <span className="text-ink">{value}</span>
+    </div>
+  );
+}
+
+/** Daily objectives — quests that visualize the loop, never replace it. */
+export function ObjectivesStrip({
+  resolved,
+  sealed,
+  avoided,
+}: {
+  resolved: boolean;
+  sealed: boolean;
+  avoided: boolean;
+}) {
+  const items = [
+    { label: "Resolve the bet", done: resolved },
+    { label: "Seal a record", done: sealed },
+    { label: "Name what you avoided", done: avoided },
+  ];
+  const all = items.every((i) => i.done);
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+      {items.map((i) => (
+        <span key={i.label} className="flex items-center gap-2 text-[0.8125rem]">
+          <span
+            className={`grid h-4 w-4 place-items-center rounded-[3px] border text-[0.5625rem] ${
+              i.done ? "border-transparent text-accent-ink" : "border-line text-transparent"
+            }`}
+            style={i.done ? { background: "var(--gold)", color: "#171004" } : undefined}
+          >
+            ✓
+          </span>
+          <span className={i.done ? "text-ink" : "text-muted"}>{i.label}</span>
+        </span>
+      ))}
+      <span className={`type-mono ml-auto text-[0.6875rem] ${all ? "" : "text-muted/70"}`} style={all ? { color: "var(--gold)" } : undefined}>
+        {all ? "day cleared +5 bp" : `clear all three +${ECON.dayClearedPay} bp`}
+      </span>
+    </div>
+  );
+}
+
+/** Momentum Shield — the founder-approved bp sink. Insurance, never rank. */
+export function ShieldCard({
+  held,
+  balance,
+  onBuy,
+}: {
+  held: boolean;
+  balance: number;
+  onBuy: () => void;
+}) {
+  const affordable = balance >= ECON.shieldCost;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <Label>momentum shield</Label>
+        {held && (
+          <span className="type-mono text-[0.6875rem]" style={{ color: "var(--gold)" }}>
+            held
+          </span>
+        )}
+      </div>
+      {held ? (
+        <p className="mt-2 text-[0.75rem] text-muted">
+          One failed verdict burns the shield instead of the chain.
+        </p>
+      ) : (
+        <div className="mt-2">
+          <button
+            onClick={onBuy}
+            disabled={!affordable}
+            className="type-mono rounded-[var(--radius-sm)] border px-3 py-1.5 text-[0.75rem] transition-colors duration-[var(--dur-fast)] disabled:opacity-40"
+            style={{ borderColor: "var(--gold)", color: "var(--gold)" }}
+          >
+            insure the chain · −{ECON.shieldCost} bp
+          </button>
+          {!affordable && <p className="type-mono mt-1 text-[0.625rem] text-muted">not enough bp</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Grip — the composite lock-in score (density + momentum + calibration + completion). */
+export function GripDial({ grip, size = 74 }: { grip: number; size?: number }) {
+  const r = 30;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="flex items-center gap-3">
+      <svg width={size} height={size} viewBox="0 0 74 74" aria-label={`Grip ${grip} of 100`}>
+        <circle cx="37" cy="37" r={r} fill="none" stroke="var(--line)" strokeWidth="5" />
+        <circle
+          cx="37"
+          cy="37"
+          r={r}
+          fill="none"
+          stroke="var(--gold)"
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - grip / 100)}
+          transform="rotate(-90 37 37)"
+        />
+        <text x="37" y="42" textAnchor="middle" className="type-mono" fontSize="16" fill="var(--ink)">
+          {grip}
+        </text>
+      </svg>
+      <div>
+        <Label>grip</Label>
+        <p className="mt-1 text-[0.6875rem] leading-snug text-muted">
+          density · momentum
+          <br />
+          calibration · completion
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** The only board: you vs. previous self. */
+export function PRBoard({ prs }: { prs: PersonalRecords }) {
+  const rows = [
+    { label: "Longest chain", value: `${prs.longestChain} kept` },
+    { label: "Best day", value: `${prs.bestDayBp} bp` },
+    { label: "Best week", value: `${prs.bestWeekBp} bp` },
+    { label: "Records sealed", value: String(prs.recordsLogged) },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {rows.map((r) => (
+        <div key={r.label} className="rounded-[var(--radius-sm)] border border-line bg-surface-2 p-3">
+          <Label>{r.label}</Label>
+          <div className="type-mono mt-1 text-[1.125rem]" style={{ color: "var(--gold)" }}>
+            {r.value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The cabinet — computed trophies. Locked ones show their price in work. */
+export function TrophyCabinet({ achievements }: { achievements: Achievement[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
+      {achievements.map((a) => (
+        <div
+          key={a.id}
+          className={`rounded-[var(--radius-sm)] border p-3 ${
+            a.earned ? "border-line bg-surface-2" : "border-line/50 opacity-50"
+          }`}
+          title={a.desc}
+        >
+          <div className="flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M7 4h10v4a5 5 0 0 1-10 0V4Z"
+                stroke={a.earned ? "var(--gold)" : "var(--muted)"}
+                strokeWidth="1.8"
+              />
+              <path d="M12 13v4M8 20h8" stroke={a.earned ? "var(--gold)" : "var(--muted)"} strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <span className={`text-[0.8125rem] font-medium ${a.earned ? "text-ink" : "text-muted"}`}>
+              {a.name}
+            </span>
+          </div>
+          <p className="mt-1 text-[0.6875rem] leading-snug text-muted">{a.desc}</p>
+        </div>
+      ))}
     </div>
   );
 }

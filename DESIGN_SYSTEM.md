@@ -210,6 +210,34 @@ prototype stub).
 labels, grouped silent-day ticks, auto-scrolled to the newest end; the jump-to-date mini-calendar scrolls
 the selected node into view. The strip owns its own `overflow-x-auto`; the page never scrolls sideways.
 
+## 8d · The moat pass (added 2026-07-09, founder feedback round 4)
+
+Category feature parity around the loop (the instantly.ai play), grounded in a research sweep of
+Habitica/Streaks/Habitify/Strides feature sets and Duolingo retention mechanics:
+
+- **Measurable goals** (Strides): `Area.target` + gold progress bars on `/areas` and area tiles.
+- **Grip** (Habitify "Habit Strength"): composite 0–100 (40% density, 25% momentum, 20% calibration,
+  15% completion) — dial in the `/today` strip and on `/analytics`.
+- **Weekly Debrief**: framework W1–W5 finally implemented at `/weekly`; W1/W2 pre-filled from the ledger;
+  pays +25 bp and stamps the week.
+- **Daily objectives** (Duolingo quests): a strip that *visualizes* the loop's own steps; clearing all
+  three (resolve, seal, avoidance named) pays +5. No new tracking, one small bonus.
+- **Momentum Shield** (streak freeze): **economy-law amendment — bp is now spendable on insurance**
+  (150 bp, hold 1, burns on a failed verdict, chain holds via `Mission.shielded`). Ranks and cosmetics
+  remain un-buyable. Sinks make the balance real money.
+- **Personal Records + Trophies**: leaderboards deliberately excluded (identity: you vs. previous self);
+  PR board + 13 computed achievements ("the cabinet") on `/analytics`.
+- **Starter packs**: six one-tap area templates.
+- **1% Coach (beta)**: deterministic rules only — recurring-weakness quick-picks on T3, completion-rate
+  brief on the arm screen. No API, labeled beta.
+- **Focus missions** (`/focus`): the timer that *generates S1 evidence* (tap-to-insert chip).
+- **Fuel** (`/motivation`): community feed (founder-review moderation queue: pending → approve/reject),
+  private collection, save counts, and **pin as today's line** (overrides every hard-line surface via
+  `useHardLine`, which merges the user's saved Fuel into the rotation pool).
+- **Reminders + integrations**: push time picker (stub) and Apple Health / Calendar / Notion / Zapier
+  "coming" chips — moat marketing on the landing's "whole arsenal" grid.
+- **Brand**: "1% a day is the floor, not the ceiling" — landing + analytics compounding panel.
+
 ## 9 · Audit results (run against the built prototype, all screens screenshotted)
 
 | # | Test | Result | Evidence |

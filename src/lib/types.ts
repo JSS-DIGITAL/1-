@@ -47,6 +47,8 @@ export interface Mission {
   confidence: number; // 0–10, the calibration prediction
   ifThen?: string;
   outcome?: MissionOutcome; // ruled by the next day's Teacher (T1)
+  /** A Momentum Shield burned on this failure — the chain holds through it. */
+  shielded?: boolean;
 }
 
 export interface Area {
@@ -56,6 +58,8 @@ export interface Area {
   metrics: MetricDef[];
   standards: string[];
   createdAt: string;
+  /** Measurable target (Strides-style): metric must reach `value` by `by`. */
+  target?: { metricKey: string; value: number; by: string };
 }
 
 export type Recurrence = "new" | "repeat" | "chronic";
@@ -84,9 +88,40 @@ export type LedgerBook = "candor" | "judgment";
 export interface LedgerEntry {
   date: string;
   book: LedgerBook;
-  source: "candor" | "resolve" | "bounty";
+  source: "candor" | "resolve" | "bounty" | "shield" | "weekly" | "objectives";
   bp: number;
   note: string;
+}
+
+/** A Fuel item — motivation, private or community. Public requires founder review. */
+export interface MotivationItem {
+  id: string;
+  text: string;
+  author: string;
+  source: "seed" | "user";
+  visibility: "private" | "pending" | "public";
+  saves: number;
+  addedAt: string;
+}
+
+export interface FocusLog {
+  date: string;
+  minutes: number;
+  missionWhat: string;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  desc: string;
+  earned: boolean;
+}
+
+export interface PersonalRecords {
+  longestChain: number;
+  bestDayBp: number;
+  bestWeekBp: number;
+  recordsLogged: number;
 }
 
 export interface Bounty {
@@ -124,4 +159,6 @@ export interface Prefs {
   density: "simple" | "operator";
   /** Stub — no real notifications in the prototype. */
   dailyPush: boolean;
+  /** Reminder time for the push stub (HH:MM). */
+  pushTime: string;
 }

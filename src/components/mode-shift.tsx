@@ -29,13 +29,14 @@ export function Vault({ reduced }: { reduced: boolean }) {
       <circle cx="60" cy="60" r="55" stroke="var(--line)" strokeWidth="2.5" fill="none" />
       <circle cx="60" cy="60" r="47" stroke="var(--line)" strokeWidth="1" fill="none" opacity="0.6" />
 
-      {/* Bolts: extend from the mechanism into the door frame */}
+      {/* Bolts: extend from the mechanism into the door frame.
+          Coordinates rounded — server/client float drift breaks hydration. */}
       {BOLT_ANGLES.map((a, i) => {
         const rad = (a * Math.PI) / 180;
-        const x1 = 60 + Math.cos(rad) * 40;
-        const y1 = 60 + Math.sin(rad) * 40;
-        const x2 = 60 + Math.cos(rad) * 54;
-        const y2 = 60 + Math.sin(rad) * 54;
+        const x1 = +(60 + Math.cos(rad) * 40).toFixed(3);
+        const y1 = +(60 + Math.sin(rad) * 40).toFixed(3);
+        const x2 = +(60 + Math.cos(rad) * 54).toFixed(3);
+        const y2 = +(60 + Math.sin(rad) * 54).toFixed(3);
         return (
           <motion.line
             key={a}
@@ -66,10 +67,10 @@ export function Vault({ reduced }: { reduced: boolean }) {
           return (
             <line
               key={a}
-              x1={60 + Math.cos(rad) * 22}
-              y1={60 + Math.sin(rad) * 22}
-              x2={60 + Math.cos(rad) * 34}
-              y2={60 + Math.sin(rad) * 34}
+              x1={+(60 + Math.cos(rad) * 22).toFixed(3)}
+              y1={+(60 + Math.sin(rad) * 22).toFixed(3)}
+              x2={+(60 + Math.cos(rad) * 34).toFixed(3)}
+              y2={+(60 + Math.sin(rad) * 34).toFixed(3)}
               stroke="var(--ink)"
               strokeWidth="2.5"
               strokeLinecap="round"

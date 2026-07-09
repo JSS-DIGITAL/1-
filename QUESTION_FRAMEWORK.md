@@ -478,6 +478,13 @@ All pass verbatim — no domain-specific rewording required.
 
 **Known residual risk** (accepted for prototype): self-report gaming cannot be fully prevented in a solo product; the calibration scoring and evidence audits are mitigation, not proof.
 
+**Implementation note (moat pass, same day):** the Weekly Review (W1–W5) is now built in the app at
+`/weekly` exactly per §6 — W1/W2 arrive pre-computed from the ledger, W3's target quick-picks come from
+the recurrence data. The economy amendment gains one clause: **bp is spendable on Momentum Shields**
+(insurance against a chain break — a sink, not a purchase of success); ranks, trophies and cosmetics
+remain un-buyable. Leaderboards were evaluated against the category and **deliberately rejected**
+(social comparison violates the user-vs-previous-self identity); Personal Records replace them.
+
 **Further founder deviations (premium pass, same day):**
 - **Unlimited prose answers.** The `line`/`text` shapes no longer enforce character caps; boxes auto-grow and advertise "no limit". Brevity remains *advice* (hints unchanged) — the Brevity test now reads "answerable well in a few sentences", not "enforced by the box".
 - **Hard lines.** Must-Not-Exist §4 is narrowed: motivational content is banned *inside the loop* (questions, answers, payouts) but permitted in the chrome as terse, aggressive one-liners (login, dashboard, arm screen, failed verdicts, empty states), user-disableable. Rationale: the founder wants the product to punch; the loop's analytical integrity is preserved by keeping the lines out of the questions and the math.

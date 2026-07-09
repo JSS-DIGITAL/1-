@@ -9,19 +9,39 @@ import { useRouter } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Button, Card, Chip, CompoundRule, Label, StatTile } from "@/components/ui";
 import { DensityStrip, Sparkline } from "@/components/charts";
-import { BalanceTicker, BountyCard, MomentumMeter, RankBadge } from "@/components/economy-ui";
-import { hardLine } from "@/lib/quotes";
-import { useAnalytics, useApp, useAreaSeries, useEconomy, useYesterdayMission } from "@/lib/store";
+import {
+  BalanceTicker,
+  BountyCard,
+  GripDial,
+  MomentumMeter,
+  ObjectivesStrip,
+  RankBadge,
+  ShieldCard,
+} from "@/components/economy-ui";
+import { candorForQuestion } from "@/lib/economy";
+import { dayOffset } from "@/lib/mock";
+import { useAnalytics, useApp, useAreaSeries, useEconomy, useHardLine, useYesterdayMission } from "@/lib/store";
 
 export default function TodayPage() {
   const router = useRouter();
-  const { areas, todayDone, setPendingS1, missions, prefs } = useApp();
+  const { areas, todayDone, setPendingS1, missions, prefs, records, shieldHeld, buyShield, weeklyDone } =
+    useApp();
   const standing = useYesterdayMission();
   const analytics = useAnalytics();
   const econ = useEconomy();
+  const dashLine = useHardLine("dash");
   const openBounty = econ.bounties.find((b) => b.status === "open");
   const simple = prefs.density === "simple";
   const today = new Date();
+
+  // Daily objectives, derived straight from today's data.
+  const todayISO = dayOffset(0);
+  const todayRecord = records.find((r) => r.date === todayISO);
+  const objResolved = missions.some((m) => m.date === todayISO && Boolean(m.outcome));
+  const objSealed = Boolean(todayRecord);
+  const objAvoided = todayRecord
+    ? candorForQuestion("S4", todayRecord.answers, todayRecord.kind) > 0
+    : false;
 
   const answerMission = (v: boolean) => {
     setPendingS1(v);
@@ -44,11 +64,40 @@ export default function TodayPage() {
         {todayDone && <Chip tone="accent">+0.01 filed</Chip>}
       </div>
 
-      {/* The economy strip: balance, rank, momentum. */}
+      {/* The economy strip: balance, rank, momentum, grip, shield, PRs. */}
       <Card className="mt-6 grid gap-6 md:grid-cols-3">
-        <BalanceTicker balance={econ.balance} />
+        <div>
+          <BalanceTicker balance={econ.balance} />
+          <p className="type-mono mt-2 text-[0.625rem] text-muted">
+            best day {econ.prs.bestDayBp} bp · longest chain {econ.prs.longestChain}
+          </p>
+          {econ.nextRankGap !== null && econ.nextRankGap <= 60 && (
+            <p className="type-mono mt-1 text-[0.6875rem]" style={{ color: "var(--gold)" }}>
+              −{econ.nextRankGap} bp to {econ.rank.next?.name}
+            </p>
+          )}
+        </div>
         <RankBadge rank={econ.rank} balance={econ.balance} />
         <MomentumMeter chain={econ.chain} momentum={econ.momentum} />
+        <GripDial grip={econ.grip} />
+        <ShieldCard held={shieldHeld} balance={econ.balance} onBuy={buyShield} />
+        <div>
+          <Label>Weekly debrief</Label>
+          {weeklyDone ? (
+            <p className="type-mono mt-2 text-[0.75rem]" style={{ color: "var(--gold)" }}>
+              week stamped
+            </p>
+          ) : (
+            <Link href="/weekly" className="type-mono mt-2 inline-block text-[0.75rem] text-accent underline">
+              close the week · +25 bp
+            </Link>
+          )}
+        </div>
+      </Card>
+
+      {/* Daily objectives — the quest strip. */}
+      <Card className="mt-[var(--gap)]">
+        <ObjectivesStrip resolved={objResolved} sealed={objSealed} avoided={objAvoided} />
       </Card>
 
       <div className="mt-[var(--gap)] grid gap-[var(--gap)] lg:grid-cols-[1.6fr_1fr]">
@@ -119,11 +168,11 @@ export default function TodayPage() {
         )}
       </div>
 
-      {/* The hard line — loud, where it can't be missed. */}
+      {/* The hard line — loud, where it can't be missed. Pinned Fuel wins. */}
       {prefs.hardLines && (
         <blockquote className="mx-auto mt-8 max-w-2xl text-center">
           <p className="type-display text-[1.5rem] italic leading-snug md:text-[1.9rem]">
-            &ldquo;{hardLine("dash")}&rdquo;
+            &ldquo;{dashLine}&rdquo;
           </p>
           <footer className="type-mono mt-2 text-[0.75rem]" style={{ color: "var(--gold)" }}>
             — 1%

@@ -40,6 +40,7 @@ export const AREAS: Area[] = [
     ],
     standards: ["Show up. Record. Correct."],
     createdAt: dayOffset(-48),
+    target: { metricKey: "focus", value: 60, by: "daily" },
   },
   {
     id: "a1",
@@ -51,6 +52,7 @@ export const AREAS: Area[] = [
     ],
     standards: ["Hard calls before email", "No pitch without research"],
     createdAt: dayOffset(-48),
+    target: { metricKey: "booked", value: 10, by: "end of month" },
   },
   {
     id: "a2",
@@ -62,6 +64,7 @@ export const AREAS: Area[] = [
     ],
     standards: ["Full depth or it doesn't count", "Log every set"],
     createdAt: dayOffset(-48),
+    target: { metricKey: "volume", value: 5700, by: "quarter end" },
   },
   {
     id: "a3",
@@ -73,6 +76,7 @@ export const AREAS: Area[] = [
     ],
     standards: ["Production before recognition"],
     createdAt: dayOffset(-40),
+    target: { metricKey: "minutes", value: 40, by: "daily by December" },
   },
 ];
 

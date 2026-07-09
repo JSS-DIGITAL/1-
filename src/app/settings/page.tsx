@@ -157,16 +157,41 @@ export default function SettingsPage() {
             />
             <PrefRow
               label="Daily push"
-              detail="21:00 — calls you out if the record is empty (stub in the prototype)"
+              detail="Calls you out if the record is empty (stub in the prototype)"
               value={prefs.dailyPush}
               onChange={(v) => setPrefs({ dailyPush: v })}
             />
+            {prefs.dailyPush && (
+              <div className="flex items-center justify-between gap-4 pl-4">
+                <span className="text-[0.75rem] text-muted">Reminder time</span>
+                <input
+                  type="time"
+                  value={prefs.pushTime}
+                  onChange={(e) => setPrefs({ pushTime: e.target.value })}
+                  className="type-mono rounded-[var(--radius-sm)] border border-line bg-surface-2 px-2 py-1 text-[0.8125rem] text-ink outline-none focus:border-accent"
+                />
+              </div>
+            )}
             <PrefRow
               label="Mode-shift sound"
               detail="Off by default; the shift is visual"
               value={prefs.sound}
               onChange={(v) => setPrefs({ sound: v })}
             />
+          </div>
+        </Card>
+
+        <Card>
+          <Label className="mb-3">Integrations</Label>
+          <p className="mb-3 text-[0.8125rem] text-muted">
+            Auto-fill the scoreboard from where the numbers already live.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {["Apple Health", "Google Calendar", "Notion export", "Zapier"].map((n) => (
+              <span key={n} className="type-mono rounded-full border border-line px-3 py-1.5 text-[0.6875rem] text-muted">
+                {n} · coming
+              </span>
+            ))}
           </div>
         </Card>
 

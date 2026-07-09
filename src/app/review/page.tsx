@@ -10,14 +10,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { usePrefersReduced } from "@/lib/use-reduced";
 import { QUESTIONS, REVERSE_SHIFT_LINE, studentSteps, teacherSteps } from "@/lib/framework";
 import type { AnswerValue, MissionOutcome, Question, ResolveResult } from "@/lib/types";
-import { useApp, useEconomy, useYesterdayMission } from "@/lib/store";
+import { useApp, useEconomy, useHardLine, useYesterdayMission } from "@/lib/store";
 import { candorForQuestion, chainFrom, drawSeal, momentumFromChain, resolveWager } from "@/lib/economy";
 import { dayOffset } from "@/lib/mock";
 import { isAnswered, ShapeInput } from "@/components/inputs";
 import { ModeShift } from "@/components/mode-shift";
 import { RankUpTakeover, ResolveCard, SealReveal } from "@/components/economy-ui";
 import { CountUp } from "@/components/charts";
-import { hardLine } from "@/lib/quotes";
 import Link from "next/link";
 import { Button, Card, Chip, CompoundRule, Label, ProgressSegments } from "@/components/ui";
 
@@ -52,8 +51,11 @@ export default function ReviewPage() {
   const [resolveOpen, setResolveOpen] = useState(false);
   const [crumb, setCrumb] = useState<{ bp: number; key: number } | null>(null);
   const [showRankUp, setShowRankUp] = useState(false);
+  const [shieldBurn, setShieldBurn] = useState(false);
   const econ = useEconomy();
-  const { missions } = useApp();
+  const { missions, shieldHeld, focusLogs } = useApp();
+  const armLine = useHardLine("arm");
+  const failLine = useHardLine("failed");
 
   const hasMission = Boolean(standing);
   const s1 = answers.S1;
@@ -111,6 +113,7 @@ export default function ReviewPage() {
         );
         setResolveResult(res);
         setResolveOpen(true);
+        setShieldBurn(t1.value === "failed" && shieldHeld);
       }
     }
 
@@ -121,7 +124,7 @@ export default function ReviewPage() {
     if (phase === "student") {
       setPhase("shift");
     } else {
-      completeToday({ areaId, kind: mvd ? "mvd" : "full", answers });
+      completeToday({ areaId, kind: mvd ? "mvd" : "full", answers, burnShield: shieldBurn });
       setPhase("commit");
     }
   };
@@ -155,9 +158,10 @@ export default function ReviewPage() {
           <h1 className="type-display mt-2 text-[1.75rem]">Arm the loop.</h1>
           {prefs.hardLines && (
             <p className="type-display mt-3 text-[1.125rem] italic leading-snug text-ink/90">
-              &ldquo;{hardLine("arm")}&rdquo;
+              &ldquo;{armLine}&rdquo;
             </p>
           )}
+          <CoachBrief areaId={areaId} />
           <Card className="mt-6 space-y-5">
             <div>
               <Label className="mb-2">Focus area</Label>
@@ -275,6 +279,31 @@ export default function ReviewPage() {
                   this call is your stake — it resolves at tomorrow&apos;s verdict. honest is the best play.
                 </p>
               )}
+              {effective.id === "S1" && focusLogs.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {focusLogs.slice(-3).map((log, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() =>
+                        setAnswers((a) => {
+                          const s1 = a.S1;
+                          if (s1?.kind !== "binary") return a;
+                          return {
+                            ...a,
+                            S1: { ...s1, evidence: `focus session · ${log.minutes} min · logged in app` },
+                          };
+                        })
+                      }
+                      className="type-mono rounded-full border px-3 py-1 text-[0.6875rem]"
+                      style={{ borderColor: "var(--gold)", color: "var(--gold)" }}
+                    >
+                      use: focus session · {log.minutes} min
+                    </button>
+                  ))}
+                </div>
+              )}
+              {effective.id === "T3" && <CoachChips answers={answers} setAnswers={setAnswers} />}
             </motion.div>
           </AnimatePresence>
 
@@ -317,7 +346,8 @@ export default function ReviewPage() {
           result={resolveResult}
           balanceAfter={econ.balance + resolveResult.total}
           onCollect={() => setResolveOpen(false)}
-          line={resolveResult.outcome === "failed" && prefs.hardLines ? hardLine("failed") : undefined}
+          line={resolveResult.outcome === "failed" && prefs.hardLines ? failLine : undefined}
+          shieldBurn={shieldBurn}
         />
       )}
 
@@ -338,6 +368,63 @@ export default function ReviewPage() {
         />
       )}
     </Wrap>
+  );
+}
+
+/** Coach · beta — deterministic rules over the record, no API. */
+function CoachBrief({ areaId }: { areaId: string }) {
+  const { missions, areas } = useApp();
+  const judged = missions.filter((m) => m.areaId === areaId && m.outcome);
+  if (judged.length === 0) return null;
+  const exec = judged.filter((m) => m.outcome === "executed").length;
+  const name = areas.find((a) => a.id === areaId)?.name ?? "this area";
+  return (
+    <p className="type-mono mt-2 text-[0.6875rem] text-muted">
+      coach · beta — you&apos;re {exec}/{judged.length} on {name} in the record. call the stake honestly.
+    </p>
+  );
+}
+
+function CoachChips({
+  answers,
+  setAnswers,
+}: {
+  answers: Record<string, AnswerValue>;
+  setAnswers: React.Dispatch<React.SetStateAction<Record<string, AnswerValue>>>;
+}) {
+  const econ = useEconomy();
+  const open = econ.bounties.filter((b) => b.status === "open").slice(0, 3);
+  if (open.length === 0) return null;
+  const t3 = answers.T3;
+  return (
+    <div className="mt-3">
+      <p className="type-mono text-[0.625rem] uppercase tracking-[0.2em] text-muted">
+        coach · beta — your repeat offenders
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {open.map((b) => (
+          <button
+            key={b.text}
+            type="button"
+            onClick={() =>
+              setAnswers((a) => ({
+                ...a,
+                T3: { kind: "enum", value: t3?.kind === "enum" ? t3.value : "", note: b.text },
+              }))
+            }
+            className="rounded-full border border-line px-3 py-1 text-[0.6875rem] text-muted hover:border-accent hover:text-ink"
+          >
+            {b.text} · {b.count}×
+          </button>
+        ))}
+      </div>
+      {open[0] && open[0].count >= 3 && (
+        <p className="type-mono mt-2 text-[0.625rem] text-muted">
+          &ldquo;{open[0].text}&rdquo; has been flagged {open[0].count}× — a system change beats another
+          promise.
+        </p>
+      )}
+    </div>
   );
 }
 

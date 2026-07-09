@@ -3,12 +3,14 @@
 // All tuning constants live in ECON; retune there, nowhere else.
 
 import type {
+  Achievement,
   AnswerValue,
   Bounty,
   DayRecord,
   LedgerEntry,
   Mission,
   MissionOutcome,
+  PersonalRecords,
   RankInfo,
   ResolveResult,
   Seal,
@@ -33,6 +35,9 @@ export const ECON = {
   },
   bountyPay: 100,
   bountyKillWindowDays: 14,
+  shieldCost: 150,
+  weeklyDebriefPay: 25,
+  dayClearedPay: 5,
 } as const;
 
 // ---- The Wager ----
@@ -45,12 +50,14 @@ export function momentumFromChain(chain: number): number {
   return 1 + ECON.momentumStep * Math.min(chain, ECON.momentumChainCap);
 }
 
-/** Consecutive `executed` outcomes at the tail of the judged missions. */
+/** Consecutive `executed` outcomes at the tail of the judged missions.
+ *  A shielded failure holds the chain (doesn't extend it, doesn't break it). */
 export function chainFrom(missions: Mission[]): number {
   const judged = missions.filter((m) => m.outcome).sort((a, b) => a.date.localeCompare(b.date));
   let chain = 0;
   for (let i = judged.length - 1; i >= 0; i--) {
     if (judged[i].outcome === "executed") chain++;
+    else if (judged[i].shielded) continue;
     else break;
   }
   return chain;
@@ -244,4 +251,82 @@ export function rankFor(totalBp: number): RankInfo {
 
 export function balanceOf(ledger: LedgerEntry[]): number {
   return ledger.reduce((s, e) => s + e.bp, 0);
+}
+
+// ---- Grip: the composite lock-in score (Habitify-class "strength") ----
+
+export function gripFrom(opts: {
+  density30: number; // 0–1: fraction of last 30 days with a record
+  chain: number;
+  calibrationError: number; // 0–1
+  completion: number; // 0–1
+}): number {
+  const momentumPart = Math.min(opts.chain, 10) / 10;
+  const calPart = 1 - Math.min(opts.calibrationError * 2, 1);
+  const score =
+    40 * opts.density30 + 25 * momentumPart + 20 * calPart + 15 * opts.completion;
+  return Math.round(Math.min(100, Math.max(0, score)));
+}
+
+// ---- Personal Records: the only board — you vs. previous self ----
+
+export function personalRecordsFrom(missions: Mission[], records: DayRecord[], ledger: LedgerEntry[]): PersonalRecords {
+  const judged = missions.filter((m) => m.outcome).sort((a, b) => a.date.localeCompare(b.date));
+  let longest = 0;
+  let run = 0;
+  for (const m of judged) {
+    if (m.outcome === "executed") {
+      run++;
+      longest = Math.max(longest, run);
+    } else if (!m.shielded) {
+      run = 0;
+    }
+  }
+
+  const byDate = new Map<string, number>();
+  for (const e of ledger) if (e.bp > 0) byDate.set(e.date, (byDate.get(e.date) ?? 0) + e.bp);
+  const bestDayBp = Math.max(0, ...byDate.values());
+
+  const byWeek = new Map<string, number>();
+  for (const [date, bp] of byDate) {
+    const d = new Date(`${date}T00:00:00`);
+    const week = `${d.getFullYear()}-w${Math.floor((d.getTime() / 86400000 + 4) / 7)}`;
+    byWeek.set(week, (byWeek.get(week) ?? 0) + bp);
+  }
+  const bestWeekBp = Math.max(0, ...byWeek.values());
+
+  return { longestChain: longest, bestDayBp, bestWeekBp, recordsLogged: records.length };
+}
+
+// ---- Trophies: tiered awards, all computed, none purchasable ----
+
+export function achievementsFrom(opts: {
+  records: DayRecord[];
+  missions: Mission[];
+  bounties: Bounty[];
+  prs: PersonalRecords;
+  rankIndex: number;
+  weeklyDone: boolean;
+}): Achievement[] {
+  const { records, bounties, prs, rankIndex, weeklyDone } = opts;
+  const fullLast7 = (() => {
+    const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 7);
+    return sorted.length === 7 && sorted.every((r) => r.kind === "full");
+  })();
+  const seals = (r: SealRarity) => records.filter((x) => x.seal?.rarity === r).length;
+  return [
+    { id: "first-seal", name: "First Seal", desc: "Seal your first record", earned: records.length >= 1 },
+    { id: "chain-3", name: "Chain III", desc: "3 kept promises in a row", earned: prs.longestChain >= 3 },
+    { id: "chain-7", name: "Chain VII", desc: "7 kept promises in a row", earned: prs.longestChain >= 7 },
+    { id: "chain-10", name: "Full Chain", desc: "10 kept promises — max momentum", earned: prs.longestChain >= 10 },
+    { id: "records-10", name: "On the Books", desc: "10 records sealed", earned: records.length >= 10 },
+    { id: "records-30", name: "The Archive", desc: "30 records sealed", earned: records.length >= 30 },
+    { id: "first-kill", name: "First Kill", desc: "Collect a weakness bounty", earned: bounties.some((b) => b.status === "killed") },
+    { id: "iron-week", name: "Iron Week", desc: "7 full records in a row", earned: fullLast7 },
+    { id: "gold-draw", name: "Gold Draw", desc: "Draw a gold seal (8%)", earned: seals("ember") >= 1 },
+    { id: "obsidian-draw", name: "Obsidian Draw", desc: "Draw an obsidian seal (2%)", earned: seals("oxblood") >= 1 },
+    { id: "examiner", name: "Examiner", desc: "Reach the Examiner rank", earned: rankIndex >= 3 },
+    { id: "teacher", name: "The Teacher", desc: "Reach Teacher I", earned: rankIndex >= 4 },
+    { id: "debrief", name: "The Debrief", desc: "Complete a weekly debrief", earned: weeklyDone },
+  ];
 }

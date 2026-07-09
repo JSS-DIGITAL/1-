@@ -85,7 +85,8 @@ export default function Landing() {
               <CountUp to={37.78} decimals={2} duration={1400} />
             </div>
             <div className="mt-1 text-[0.8125rem] text-muted">
-              One percent a day is 37× in a year. Zero percent a day is another year.
+              One percent a day is 37× in a year — and 1% is the{" "}
+              <span className="text-ink">floor, not the ceiling</span>. Zero percent a day is another year.
             </div>
           </div>
         </div>
@@ -217,6 +218,33 @@ export default function Landing() {
                 the ones who like the writing. Unlimited length. Everything counts.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* The arsenal — the moat, said out loud. */}
+      <section className="border-t border-line">
+        <div className="mx-auto w-full max-w-6xl px-5 py-16 md:py-24">
+          <Label>The whole arsenal</Label>
+          <h2 className="type-display mt-2 max-w-2xl text-[1.9rem] leading-tight md:text-[2.5rem]">
+            Everything the other apps have. Around the one loop they don&apos;t.
+          </h2>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["Measurable goals", "Targets with progress bars, per area — not vibes"],
+              ["Weekly debrief", "The ledger counts, you rule. Twelve minutes, once a week"],
+              ["Focus missions", "A timer that generates tonight's evidence"],
+              ["1% Coach", "Your repeat offenders, surfaced before you excuse them"],
+              ["Fuel community", "Motivation you save, pin, and share — founder-reviewed"],
+              ["Momentum shields", "Insure the chain with earned bp. Casino rules"],
+              ["Trophies & PRs", "The only leaderboard is your previous self"],
+              ["Integrations", "Apple Health, Calendar, Notion, Zapier — coming"],
+            ].map(([name, desc]) => (
+              <div key={name} className="rounded-[14px] border border-line bg-surface p-5">
+                <h3 className="type-display text-[1.0625rem]">{name}</h3>
+                <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">{desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

@@ -5,7 +5,8 @@
 
 import { Shell } from "@/components/shell";
 import { CalibrationPlot, CompoundCurve, CountUp, DensityStrip, RecurrenceBars, Sparkline } from "@/components/charts";
-import { BountyCard } from "@/components/economy-ui";
+import { BountyCard, GripDial, PRBoard, TrophyCabinet } from "@/components/economy-ui";
+import { RANKS } from "@/lib/economy";
 import { Card, Label, StatTile } from "@/components/ui";
 import { useAnalytics, useEconomy } from "@/lib/store";
 
@@ -107,13 +108,54 @@ export default function AnalyticsPage() {
         <Card>
           <Label className="mb-1">Is it compounding?</Label>
           <p className="mb-4 text-[0.8125rem] text-muted">
-            Executed day ×1.01, partial ×1.005, missed ×1. Your curve is currently at{" "}
+            1%/day is the <span className="text-ink">floor, not the ceiling</span> — honest calls and kept
+            promises compound faster. Executed ×1.01, partial ×1.005, missed ×1. Your curve:{" "}
             <span className="type-mono text-ink">
               ×<CountUp to={a.curve[a.curve.length - 1] ?? 1} decimals={3} />
             </span>
             .
           </p>
           <CompoundCurve curve={a.curve} ideal={a.ideal} />
+        </Card>
+
+        <Card>
+          <Label className="mb-1">How locked in are you?</Label>
+          <p className="mb-4 text-[0.8125rem] text-muted">
+            Grip is the composite: 40% record density, 25% momentum, 20% calibration, 15% completion.
+          </p>
+          <GripDial grip={econ.grip} size={90} />
+          <div className="mt-4 border-t border-line pt-4">
+            <Label className="mb-2">The ladder</Label>
+            <div className="space-y-1.5">
+              {RANKS.map((r, i) => (
+                <div key={r.name} className="type-mono flex items-center justify-between text-[0.75rem]">
+                  <span className={i <= econ.rank.index ? "text-ink" : "text-muted/50"}>
+                    {i <= econ.rank.index ? "◆" : "◇"} {r.name}
+                  </span>
+                  <span className={i <= econ.rank.index ? "" : "text-muted/50"} style={i <= econ.rank.index ? { color: "var(--gold)" } : undefined}>
+                    {r.min} bp
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <Label className="mb-1">You vs. previous self — the only board</Label>
+          <p className="mb-4 text-[0.8125rem] text-muted">
+            No leaderboards. No strangers. The records that matter are yours to beat.
+          </p>
+          <PRBoard prs={econ.prs} />
+        </Card>
+
+        <Card>
+          <Label className="mb-1">The cabinet</Label>
+          <p className="mb-4 text-[0.8125rem] text-muted">
+            {econ.achievements.filter((x) => x.earned).length} of {econ.achievements.length} earned. None are
+            purchasable.
+          </p>
+          <TrophyCabinet achievements={econ.achievements} />
         </Card>
 
         <Card>

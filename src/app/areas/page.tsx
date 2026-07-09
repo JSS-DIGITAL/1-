@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Shell } from "@/components/shell";
 import { Sparkline } from "@/components/charts";
 import { Button, Card, Chip, Label } from "@/components/ui";
+import { AREA_TEMPLATES } from "@/lib/templates";
 import { useApp, useAreaSeries } from "@/lib/store";
 import type { Area } from "@/lib/types";
 
@@ -71,6 +72,24 @@ export default function AreasPage() {
         </Card>
       )}
 
+      {/* Starter packs — one-tap areas. */}
+      <div className="mt-6">
+        <Label className="mb-2">Starter packs</Label>
+        <div className="flex flex-wrap gap-2">
+          {AREA_TEMPLATES.map((t) => (
+            <button
+              key={t.name}
+              onClick={() => addArea(t)}
+              disabled={areas.some((a) => a.name === t.name)}
+              className="rounded-full border border-line px-4 py-1.5 text-[0.8125rem] text-muted transition-colors duration-[var(--dur-fast)] hover:border-accent hover:text-ink disabled:opacity-40"
+              title={t.goal}
+            >
+              + {t.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="mt-6 grid gap-[var(--gap)] md:grid-cols-2">
         {areas.map((a) => (
           <AreaCard key={a.id} area={a} count={records.filter((r) => r.areaId === a.id).length} />
@@ -82,6 +101,10 @@ export default function AreasPage() {
 
 function AreaCard({ area, count }: { area: Area; count: number }) {
   const series = useAreaSeries(area.id, area.metrics[0]?.key ?? "");
+  const targetSeries = useAreaSeries(area.id, area.target?.metricKey ?? area.metrics[0]?.key ?? "");
+  const latest = targetSeries[targetSeries.length - 1];
+  const progress =
+    area.target && latest !== undefined ? Math.min(1, Math.max(0, latest / area.target.value)) : null;
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
@@ -93,6 +116,21 @@ function AreaCard({ area, count }: { area: Area; count: number }) {
           <span className="type-mono">{count}</span>&nbsp;records
         </Chip>
       </div>
+
+      {area.target && progress !== null && (
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <Label>Target · {area.target.metricKey}</Label>
+            <span className="type-mono text-[0.75rem]" style={{ color: "var(--gold)" }}>
+              {latest} / {area.target.value} · {Math.round(progress * 100)}%
+            </span>
+          </div>
+          <div className="mt-1.5 h-[5px] w-full rounded-full bg-line/60">
+            <div className="h-full rounded-full" style={{ width: `${progress * 100}%`, background: "var(--gold)" }} />
+          </div>
+          <p className="type-mono mt-1 text-[0.625rem] text-muted">by {area.target.by}</p>
+        </div>
+      )}
 
       {area.standards.length > 0 && (
         <div className="mt-4">

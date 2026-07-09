@@ -7,23 +7,32 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { generateMock, dayOffset } from "./mock";
 import {
+  achievementsFrom,
   balanceOf,
   bountiesFrom,
   chainFrom,
   drawSeal,
+  ECON,
+  gripFrom,
   momentumFromChain,
+  personalRecordsFrom,
   rankFor,
   resolveWager,
   scoreCandor,
 } from "./economy";
+import { SEED_FUEL } from "./motivation";
+import { candorForQuestion } from "./economy";
+import { HARD_LINES } from "./quotes";
 import type {
   Area,
   AnswerValue,
   DayRecord,
+  FocusLog,
   LedgerEntry,
   Mission,
   MissionOutcome,
   Mode,
+  MotivationItem,
   Prefs,
   Recurrence,
 } from "./types";
@@ -61,6 +70,20 @@ interface AppState {
   accents: Record<Mode, AccentPair>;
   rankUp: import("./types").RankInfo | null;
   clearRankUp: () => void;
+  fuel: MotivationItem[];
+  savedFuelIds: string[];
+  shieldHeld: boolean;
+  focusLogs: FocusLog[];
+  weeklyDone: boolean;
+  pinnedLine: string | null;
+  buyShield: () => void;
+  addFuel: (text: string, share: boolean) => void;
+  approveFuel: (id: string) => void;
+  rejectFuel: (id: string) => void;
+  saveFuel: (id: string) => void;
+  pinLine: (text: string | null) => void;
+  addFocusLog: (minutes: number, missionWhat: string) => void;
+  completeWeekly: (targetWeakness: string) => void;
   setMode: (m: Mode, fade?: boolean) => void;
   setPendingS1: (v: boolean | null) => void;
   setPrefs: (p: Partial<Prefs>) => void;
@@ -70,6 +93,7 @@ interface AppState {
     areaId: string;
     kind: "full" | "mvd";
     answers: Record<string, AnswerValue>;
+    burnShield?: boolean;
   }) => void;
 }
 
@@ -91,8 +115,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     hardLines: true,
     density: "operator",
     dailyPush: true,
+    pushTime: "21:00",
   });
   const [rankUp, setRankUp] = useState<ReturnType<typeof rankFor> | null>(null);
+  const [fuel, setFuel] = useState<MotivationItem[]>(SEED_FUEL);
+  const [savedFuelIds, setSavedFuelIds] = useState<string[]>([]);
+  const [shieldHeld, setShieldHeld] = useState(false);
+  const [focusLogs, setFocusLogs] = useState<FocusLog[]>([]);
+  const [weeklyDone, setWeeklyDone] = useState(false);
+  const [pinnedLine, setPinnedLine] = useState<string | null>(null);
   const [accents, setAccents] = useState<Record<Mode, AccentPair>>({
     student: ACCENT_PRESETS.student[0],
     teacher: ACCENT_PRESETS.teacher[0],
@@ -129,7 +160,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const completeToday = useCallback(
-    ({ areaId, kind, answers }: { areaId: string; kind: "full" | "mvd"; answers: Record<string, AnswerValue> }) => {
+    ({
+      areaId,
+      kind,
+      answers,
+      burnShield,
+    }: {
+      areaId: string;
+      kind: "full" | "mvd";
+      answers: Record<string, AnswerValue>;
+      /** A failed verdict with a shield held: the shield burns, the chain holds. */
+      burnShield?: boolean;
+    }) => {
       const today = dayOffset(0);
       const newEntries: LedgerEntry[] = [];
 
@@ -138,8 +180,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const t1 = answers.T1;
       if (t1?.kind === "enum") {
         const standing = missions.find((m) => m.date === today && !m.outcome);
+        const verdict = t1.value as MissionOutcome;
         if (standing) {
-          const verdict = t1.value as MissionOutcome;
           const res = resolveWager(standing.confidence, verdict, momentumFromChain(chainFrom(missions)));
           newEntries.push({
             date: today,
@@ -149,9 +191,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             note: `${verdict} · called ${standing.confidence}/10`,
           });
         }
+        const shielded = Boolean(burnShield && verdict === "failed" && shieldHeld);
         setMissions((ms) =>
-          ms.map((m) => (m.date === today && !m.outcome ? { ...m, outcome: t1.value as MissionOutcome } : m))
+          ms.map((m) =>
+            m.date === today && !m.outcome
+              ? { ...m, outcome: verdict, shielded: shielded || undefined }
+              : m
+          )
         );
+        if (shielded) setShieldHeld(false);
+      }
+
+      // Day cleared: bet resolved + record sealed + avoidance named honestly.
+      if (t1?.kind === "enum" && candorForQuestion("S4", answers, kind) > 0) {
+        newEntries.push({
+          date: today,
+          book: "judgment",
+          source: "objectives",
+          bp: ECON.dayClearedPay,
+          note: "day cleared — all three objectives",
+        });
       }
 
       // Commit tomorrow's mission from T4/T5/T6.
@@ -200,10 +259,69 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLedger((l) => [...l, ...newEntries]);
       setTodayDone(true);
     },
-    [missions, ledger]
+    [missions, ledger, shieldHeld]
   );
 
   const clearRankUp = useCallback(() => setRankUp(null), []);
+
+  // ---- The moat: shields, fuel, focus, weekly ----
+
+  const buyShield = useCallback(() => {
+    if (shieldHeld) return;
+    if (balanceOf(ledger) < ECON.shieldCost) return;
+    setLedger((l) => [
+      ...l,
+      { date: dayOffset(0), book: "judgment", source: "shield", bp: -ECON.shieldCost, note: "momentum shield purchased" },
+    ]);
+    setShieldHeld(true);
+  }, [shieldHeld, ledger]);
+
+  const addFuel = useCallback((text: string, share: boolean) => {
+    const item: MotivationItem = {
+      id: `u-${Date.now()}`,
+      text: text.trim(),
+      author: "you",
+      source: "user",
+      visibility: share ? "pending" : "private",
+      saves: 0,
+      addedAt: dayOffset(0),
+    };
+    setFuel((f) => [item, ...f]);
+  }, []);
+
+  const approveFuel = useCallback((id: string) => {
+    setFuel((f) => f.map((i) => (i.id === id ? { ...i, visibility: "public" } : i)));
+  }, []);
+
+  const rejectFuel = useCallback((id: string) => {
+    setFuel((f) => f.map((i) => (i.id === id ? { ...i, visibility: "private" } : i)));
+  }, []);
+
+  const saveFuel = useCallback((id: string) => {
+    setSavedFuelIds((s) => (s.includes(id) ? s : [...s, id]));
+    setFuel((f) => f.map((i) => (i.id === id ? { ...i, saves: i.saves + 1 } : i)));
+  }, []);
+
+  const pinLine = useCallback((text: string | null) => setPinnedLine(text), []);
+
+  const addFocusLog = useCallback((minutes: number, missionWhat: string) => {
+    setFocusLogs((l) => [...l, { date: dayOffset(0), minutes, missionWhat }]);
+  }, []);
+
+  const completeWeekly = useCallback((targetWeakness: string) => {
+    if (weeklyDone) return;
+    setLedger((l) => [
+      ...l,
+      {
+        date: dayOffset(0),
+        book: "candor",
+        source: "weekly",
+        bp: ECON.weeklyDebriefPay,
+        note: `weekly debrief · target: ${targetWeakness.slice(0, 60)}`,
+      },
+    ]);
+    setWeeklyDone(true);
+  }, [weeklyDone]);
 
   const value: AppState = {
     areas,
@@ -217,6 +335,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     accents,
     rankUp,
     clearRankUp,
+    fuel,
+    savedFuelIds,
+    shieldHeld,
+    focusLogs,
+    weeklyDone,
+    pinnedLine,
+    buyShield,
+    addFuel,
+    approveFuel,
+    rejectFuel,
+    saveFuel,
+    pinLine,
+    addFocusLog,
+    completeWeekly,
     setMode,
     setPendingS1,
     setPrefs,
@@ -304,12 +436,14 @@ export function useYesterdayMission(): Mission | undefined {
 
 /** Everything the economy surfaces need, derived from the three source arrays. */
 export function useEconomy() {
-  const { ledger, missions, records } = useApp();
+  const { ledger, missions, records, weeklyDone } = useApp();
   return useMemo(() => {
     const balance = balanceOf(ledger);
     const candorTotal = ledger.filter((e) => e.book === "candor").reduce((s, e) => s + e.bp, 0);
     const judgmentTotal = balance - candorTotal;
     const chain = chainFrom(missions);
+    const rank = rankFor(balance);
+    const bounties = bountiesFrom(records);
 
     // Cumulative balance by day, for the balance-history chart.
     const byDate = new Map<string, number>();
@@ -319,18 +453,68 @@ export function useEconomy() {
       history.push((history[history.length - 1] ?? 0) + byDate.get(d)!);
     }
 
+    // Grip inputs.
+    let density30 = 0;
+    for (let i = 0; i < 30; i++) {
+      if (records.some((r) => r.date === dayOffset(-i))) density30++;
+    }
+    density30 /= 30;
+    const judged = missions.filter((m) => m.outcome);
+    const completion =
+      judged.length === 0 ? 0 : judged.filter((m) => m.outcome === "executed").length / judged.length;
+    const calibrationError =
+      judged.length === 0
+        ? 0
+        : judged.reduce(
+            (s, m) =>
+              s + Math.abs(m.confidence / 10 - (m.outcome === "executed" ? 1 : m.outcome === "partial" ? 0.5 : 0)),
+            0
+          ) / judged.length;
+
+    const prs = personalRecordsFrom(missions, records, ledger);
+
     return {
       balance,
       candorTotal,
       judgmentTotal,
       chain,
       momentum: momentumFromChain(chain),
-      rank: rankFor(balance),
-      bounties: bountiesFrom(records),
+      rank,
+      nextRankGap: rank.next ? rank.next.min - balance : null,
+      bounties,
       recent: [...ledger].slice(-8).reverse(),
       history,
+      grip: gripFrom({ density30, chain, calibrationError, completion }),
+      prs,
+      achievements: achievementsFrom({
+        records,
+        missions,
+        bounties,
+        prs,
+        rankIndex: rank.index,
+        weeklyDone,
+      }),
     };
-  }, [ledger, missions, records]);
+  }, [ledger, missions, records, weeklyDone]);
+}
+
+/** Today's hard line: a pinned Fuel item wins; otherwise a deterministic pick
+ *  from the built-in lines merged with the user's saved/private Fuel. */
+export function useHardLine(salt: string): string {
+  const { pinnedLine, fuel, savedFuelIds } = useApp();
+  if (pinnedLine) return pinnedLine;
+  const mine = fuel
+    .filter((i) => i.source === "user" || savedFuelIds.includes(i.id))
+    .map((i) => i.text);
+  const pool = [...HARD_LINES, ...mine];
+  const d = new Date();
+  const seed = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${salt}`;
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return pool[(h >>> 0) % pool.length];
 }
 
 export function useAreaSeries(areaId: string, metricKey: string): number[] {
