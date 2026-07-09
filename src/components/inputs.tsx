@@ -226,15 +226,16 @@ function CountInput({
               <div className="type-mono text-[0.6875rem] text-muted">last: {prevValues[m.key]}</div>
             )}
           </div>
+          {/* Standalone width — fieldCls carries w-full, which buries the label. */}
           <input
             type="number"
             inputMode="numeric"
-            className={`${fieldCls} type-mono w-28 text-right`}
+            className="type-mono w-28 shrink-0 rounded-[var(--radius-sm)] border border-line bg-surface-2 px-3 py-2.5 text-right text-[0.9375rem] text-ink outline-none placeholder:text-muted/50 focus:border-accent"
             value={v[m.key] ?? ""}
             onChange={(e) => set(m.key, e.target.value === "" ? undefined : Number(e.target.value))}
             placeholder="0"
           />
-          <span className="type-mono w-10 text-[0.75rem] text-muted">{m.unit}</span>
+          <span className="type-mono w-10 shrink-0 text-[0.75rem] text-muted">{m.unit}</span>
         </div>
       ))}
     </div>
