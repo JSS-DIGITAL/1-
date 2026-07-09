@@ -112,6 +112,29 @@ export default function SettingsPage() {
         ))}
 
         <Card>
+          <Label className="mb-3">Experience</Label>
+          <p className="mb-3 text-[0.8125rem] text-muted">
+            Two speeds, one system. Simple keeps the essentials and defaults to the minimum day; Operator
+            shows every instrument.
+          </p>
+          <div className="grid max-w-xs grid-cols-2 gap-2">
+            {(["simple", "operator"] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setPrefs({ density: d })}
+                className={`rounded-[var(--radius-sm)] border py-2.5 text-[0.875rem] capitalize transition-colors duration-[var(--dur-fast)] ${
+                  prefs.density === d
+                    ? "border-accent bg-accent text-accent-ink font-medium"
+                    : "border-line bg-surface-2 text-ink"
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
           <Label className="mb-3">Question set</Label>
           <div className="space-y-3">
             <PrefRow
@@ -131,6 +154,12 @@ export default function SettingsPage() {
               detail="Aggressive one-liners in the chrome. Never inside questions or payouts"
               value={prefs.hardLines}
               onChange={(v) => setPrefs({ hardLines: v })}
+            />
+            <PrefRow
+              label="Daily push"
+              detail="21:00 — calls you out if the record is empty (stub in the prototype)"
+              value={prefs.dailyPush}
+              onChange={(v) => setPrefs({ dailyPush: v })}
             />
             <PrefRow
               label="Mode-shift sound"

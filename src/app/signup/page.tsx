@@ -1,6 +1,6 @@
 "use client";
 
-// First impression. The compounding fact is the brand's opening argument.
+// Mock signup — mirrors the login card. No account is created.
 
 import { useState } from "react";
 import Link from "next/link";
@@ -12,7 +12,7 @@ import { Button, Label, PercentGlyph } from "@/components/ui";
 const fieldCls =
   "w-full rounded-[var(--radius-sm)] border border-line bg-surface-2 px-3 py-2.5 text-[0.9375rem] text-ink outline-none placeholder:text-muted/50 focus:border-accent";
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,24 +22,24 @@ export default function LoginPage() {
       <div className="grid w-full max-w-4xl items-center gap-10 md:grid-cols-2">
         <div>
           <PercentGlyph size={40} />
-          <h1 className="type-display mt-6 text-[3rem] leading-none md:text-[3.5rem]">1%</h1>
+          <h1 className="type-display mt-6 text-[2.5rem] leading-tight md:text-[3rem]">
+            Day one starts tonight.
+          </h1>
           <p className="mt-3 max-w-sm text-[0.9375rem] leading-relaxed text-muted">
-            Student records reality. Teacher evaluates the record. One correction, one mission, every day.
+            Record the day, seal it, judge it, place your first stake. Seven minutes — or three, on the
+            minimum day.
           </p>
-          <div className="mt-8 border-l-2 border-accent pl-4">
+          <div className="mt-8 border-l-2 pl-4" style={{ borderColor: "var(--gold)" }}>
             <div className="type-mono text-[0.8125rem] text-muted">1.01^365 =</div>
-            <div className="type-mono text-[2.25rem] leading-tight text-ink">
+            <div className="type-mono text-[2.25rem] leading-tight" style={{ color: "var(--gold)" }}>
               <CountUp to={37.78} decimals={2} duration={1400} />
             </div>
-            <div className="mt-1 text-[0.8125rem] text-muted">
-              A day is worth one percent. The year does the rest.
-            </div>
           </div>
-          <p className="type-mono mt-6 text-[0.8125rem] text-ink/80">&ldquo;{hardLine("login")}&rdquo;</p>
+          <p className="type-mono mt-6 text-[0.8125rem] text-ink/80">&ldquo;{hardLine("signup")}&rdquo;</p>
         </div>
 
         <div className="rounded-[var(--radius)] border border-line bg-surface p-[var(--pad-card)]">
-          <Label>Enter the system</Label>
+          <Label>Create your account</Label>
           <div className="mt-4 space-y-3">
             <input
               className={fieldCls}
@@ -55,20 +55,17 @@ export default function LoginPage() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
+              autoComplete="new-password"
               onKeyDown={(e) => e.key === "Enter" && router.push("/today")}
             />
             <Button className="w-full" onClick={() => router.push("/today")}>
-              Enter the system
-            </Button>
-            <Button variant="ghost" className="w-full" onClick={() => router.push("/today")}>
-              Continue with the demo record
+              Start free
             </Button>
           </div>
           <p className="mt-4 text-center text-[0.8125rem] text-muted">
-            New here?{" "}
-            <Link href="/signup" className="text-accent underline">
-              Sign up
+            Already in the system?{" "}
+            <Link href="/login" className="text-accent underline">
+              Log in
             </Link>
           </p>
           <p className="type-mono mt-4 text-[0.6875rem] text-muted/70">

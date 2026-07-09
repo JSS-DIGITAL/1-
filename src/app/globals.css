@@ -191,6 +191,67 @@ textarea {
   field-sizing: content;
 }
 
+/* Money moments. */
+@keyframes gold-pulse {
+  0% {
+    text-shadow: 0 0 0 transparent;
+  }
+  35% {
+    text-shadow: 0 0 18px color-mix(in oklab, var(--gold) 65%, transparent);
+  }
+  100% {
+    text-shadow: 0 0 0 transparent;
+  }
+}
+.gold-pulse {
+  animation: gold-pulse 900ms ease-out both;
+}
+
+@keyframes crumb {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.85);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.05);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.95);
+  }
+}
+.crumb {
+  animation: crumb 1100ms ease-out both;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.3) skewX(-12deg);
+  }
+  to {
+    transform: scale(1) skewX(-12deg);
+  }
+}
+.pop {
+  animation: pop 420ms var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-pulse,
+  .crumb,
+  .pop {
+    animation: none;
+  }
+  .crumb {
+    opacity: 1;
+  }
+}
+
 @keyframes rise {
   from {
     opacity: 0;

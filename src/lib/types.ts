@@ -120,4 +120,8 @@ export interface Prefs {
   sound: boolean;
   /** Aggressive one-liners in the chrome. Never inside questions or payouts. */
   hardLines: boolean;
+  /** Two-speed UX: simple = essentials + Minimum-day default; operator = every instrument. */
+  density: "simple" | "operator";
+  /** Stub — no real notifications in the prototype. */
+  dailyPush: boolean;
 }

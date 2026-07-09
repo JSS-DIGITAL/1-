@@ -59,6 +59,8 @@ interface AppState {
   pendingS1: boolean | null;
   prefs: Prefs;
   accents: Record<Mode, AccentPair>;
+  rankUp: import("./types").RankInfo | null;
+  clearRankUp: () => void;
   setMode: (m: Mode, fade?: boolean) => void;
   setPendingS1: (v: boolean | null) => void;
   setPrefs: (p: Partial<Prefs>) => void;
@@ -87,7 +89,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deepTier: false,
     sound: false,
     hardLines: true,
+    density: "operator",
+    dailyPush: true,
   });
+  const [rankUp, setRankUp] = useState<ReturnType<typeof rankFor> | null>(null);
   const [accents, setAccents] = useState<Record<Mode, AccentPair>>({
     student: ACCENT_PRESETS.student[0],
     teacher: ACCENT_PRESETS.teacher[0],
@@ -189,11 +194,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...rs,
         { date: today, areaId, kind, sealed: true, answers, weakness, seal: drawSeal(today) },
       ]);
+      const prevRank = rankFor(balanceOf(ledger));
+      const nextRank = rankFor(balanceOf([...ledger, ...newEntries]));
+      if (nextRank.index > prevRank.index) setRankUp(nextRank);
       setLedger((l) => [...l, ...newEntries]);
       setTodayDone(true);
     },
-    [missions]
+    [missions, ledger]
   );
+
+  const clearRankUp = useCallback(() => setRankUp(null), []);
 
   const value: AppState = {
     areas,
@@ -205,6 +215,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     pendingS1,
     prefs,
     accents,
+    rankUp,
+    clearRankUp,
     setMode,
     setPendingS1,
     setPrefs,

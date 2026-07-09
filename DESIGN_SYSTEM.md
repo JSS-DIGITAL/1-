@@ -183,6 +183,33 @@ Gamification layer, **premium casino** register: tense, sharp, mono — a tradin
 
 **Unlimited prose (founder addition)**: `line`/`text` answers auto-grow with no character cap; the affordance under each field reads `no limit — say all of it`. Brevity survives as hint-level advice, not enforcement. Structured shapes (binary, enum, scale, count, list, mission) unchanged.
 
+## 8c · Funnel + juice pass (added 2026-07-09, founder feedback round 3)
+
+**The funnel**: `/` is now the marketing landing (aggressive sales register — the one surface where hard
+lines are always on and set large); the app lives at `/today`. Top bar: Log in / Sign up; sections: hero
+(1.01³⁶⁵ fact), the loop (with the Vault SVG), the wager (static resolve mock), the hard-lines wall,
+two speeds, download-the-app (store badge stubs + phone frame + daily-push bullet), footer. `/signup`
+mirrors `/login` (both mock).
+
+**Louder lines**: `/today` carries a display-serif quote block (gold "— 1%" attribution); the arm screen
+line is display-serif italic. Still `prefs.hardLines`-gated inside the app.
+
+**The juice pack** (casino register holds):
+- Micro-pay crumbs — each completed Student question pulses its candor contribution (`candorForQuestion`
+  in economy.ts); crumbs + day base sum exactly to the sealed total. Visible money, never new money.
+- Rank-up takeover — full-screen gold ring + rank stamp on crossing a threshold ("earned, not given");
+  RANKS tuned (Teacher I 1750) so the demo crosses it on one good day.
+- Seal reveal on the commit screen — bronze+ draws flip in with odds shown ("bronze seal — 20% draw").
+- Balance gold-pulse on change; newest momentum link pops.
+
+**Two speeds**: `prefs.density` — Simple (hides `/today` stat tiles + density card, pre-selects the
+Minimum day) vs Operator (everything). Settings "Experience" control + a daily-push stub row (21:00,
+prototype stub).
+
+**Horizontal timeline**: History's rail is now sideways — oldest→newest, seal stamps as nodes, verdict
+labels, grouped silent-day ticks, auto-scrolled to the newest end; the jump-to-date mini-calendar scrolls
+the selected node into view. The strip owns its own `overflow-x-auto`; the page never scrolls sideways.
+
 ## 9 · Audit results (run against the built prototype, all screens screenshotted)
 
 | # | Test | Result | Evidence |

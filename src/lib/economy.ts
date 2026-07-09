@@ -115,6 +115,44 @@ export function scoreCandor(
   return { bp: lines.reduce((s, l) => s + l.bp, 0), lines };
 }
 
+/** One question's candor contribution — the micro-pay crumb shown as the
+ *  Student advances. Crumbs + the day base sum exactly to scoreCandor():
+ *  visible money, never new money. */
+export function candorForQuestion(
+  id: string,
+  answers: Record<string, AnswerValue>,
+  kind: "full" | "mvd"
+): number {
+  const c = ECON.candor;
+  switch (id) {
+    case "S1": {
+      const s1 = answers.S1;
+      return s1?.kind === "binary" && s1.evidence?.trim() ? c.evidence : 0;
+    }
+    case "S2": {
+      const s2 = answers.S2;
+      if (s2?.kind === "list" && s2.items.length > 0) return Math.min(s2.items.length, c.itemsMax) * c.perItem;
+      if (s2?.kind === "line" && s2.value.trim() && !NOTHING.test(s2.value)) return c.perItem;
+      return 0;
+    }
+    case "S3": {
+      const s3 = answers.S3;
+      return s3?.kind === "count" && Object.keys(s3.values).length > 0 ? c.metricsLogged : 0;
+    }
+    case "S4": {
+      const s4 = answers.S4;
+      if (!(s4?.kind === "line" && s4.value.trim() && !NOTHING.test(s4.value))) return 0;
+      return c.avoidanceNamed + (s4.second?.trim() ? c.insteadNamed : 0);
+    }
+    case "S5": {
+      const s5 = answers.S5;
+      return s5?.kind === "line" && s5.value.trim() && !NOTHING.test(s5.value) ? c.condition : 0;
+    }
+    default:
+      return kind === "mvd" ? 0 : 0;
+  }
+}
+
 // ---- Seals: variable-ratio reward on the honest act of sealing ----
 
 // Metals, not mode colours — money and trophies read the same in both rooms.
@@ -184,8 +222,8 @@ export const RANKS = [
   { name: "Student II", min: 300 },
   { name: "Student III", min: 700 },
   { name: "Examiner", min: 1200 },
-  { name: "Teacher I", min: 1800 },
-  { name: "Teacher II", min: 2600 },
+  { name: "Teacher I", min: 1750 },
+  { name: "Teacher II", min: 2500 },
 ] as const;
 
 export function rankFor(totalBp: number): RankInfo {

@@ -14,7 +14,7 @@ import { Button } from "./ui";
 
 const BOLT_ANGLES = [0, 60, 120, 180, 240, 300];
 
-function Vault({ reduced }: { reduced: boolean }) {
+export function Vault({ reduced }: { reduced: boolean }) {
   return (
     <motion.svg
       width="150"

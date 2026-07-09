@@ -11,11 +11,11 @@ import { usePrefersReduced } from "@/lib/use-reduced";
 import { QUESTIONS, REVERSE_SHIFT_LINE, studentSteps, teacherSteps } from "@/lib/framework";
 import type { AnswerValue, MissionOutcome, Question, ResolveResult } from "@/lib/types";
 import { useApp, useEconomy, useYesterdayMission } from "@/lib/store";
-import { chainFrom, momentumFromChain, resolveWager } from "@/lib/economy";
+import { candorForQuestion, chainFrom, drawSeal, momentumFromChain, resolveWager } from "@/lib/economy";
 import { dayOffset } from "@/lib/mock";
 import { isAnswered, ShapeInput } from "@/components/inputs";
 import { ModeShift } from "@/components/mode-shift";
-import { ResolveCard } from "@/components/economy-ui";
+import { RankUpTakeover, ResolveCard, SealReveal } from "@/components/economy-ui";
 import { CountUp } from "@/components/charts";
 import { hardLine } from "@/lib/quotes";
 import Link from "next/link";
@@ -26,18 +26,32 @@ type Phase = "arm" | "student" | "shift" | "teacher" | "commit";
 export default function ReviewPage() {
   const router = useRouter();
   const reduced = usePrefersReduced();
-  const { areas, records, mode, setMode, pendingS1, setPendingS1, completeToday, todayDone, prefs } =
-    useApp();
+  const {
+    areas,
+    records,
+    mode,
+    setMode,
+    pendingS1,
+    setPendingS1,
+    completeToday,
+    todayDone,
+    prefs,
+    rankUp,
+    clearRankUp,
+  } = useApp();
   const standing = useYesterdayMission();
 
   const [phase, setPhase] = useState<Phase>("arm");
   const [areaId, setAreaId] = useState(standing?.areaId ?? areas[0]?.id ?? "a1");
-  const [mvd, setMvd] = useState(false);
+  // Simple experience defaults to the minimum day (still switchable).
+  const [mvd, setMvd] = useState(prefs.density === "simple");
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [idx, setIdx] = useState(0);
   const [dir, setDir] = useState(1);
   const [resolveResult, setResolveResult] = useState<ResolveResult | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
+  const [crumb, setCrumb] = useState<{ bp: number; key: number } | null>(null);
+  const [showRankUp, setShowRankUp] = useState(false);
   const econ = useEconomy();
   const { missions } = useApp();
 
@@ -79,6 +93,13 @@ export default function ReviewPage() {
   const next = () => {
     setDir(1);
 
+    // Micro-pay: the question's candor crumb pulses as the Student advances.
+    // Visible money, not new money — crumbs sum into the sealed total.
+    if (phase === "student" && effective) {
+      const bp = candorForQuestion(effective.id, answers, mvd ? "mvd" : "full");
+      if (bp > 0) setCrumb({ bp, key: Date.now() });
+    }
+
     // T1 answered: the bet resolves — the Teacher is the payer.
     if (phase === "teacher" && currentId === "T1" && standing) {
       const t1 = answers.T1;
@@ -118,7 +139,7 @@ export default function ReviewPage() {
           <Chip tone="accent">+0.01 filed</Chip>
           <p className="type-display mt-4 text-[1.375rem]">Today&apos;s review is done.</p>
           <p className="mt-2 text-[0.875rem] text-muted">The next order stands until tomorrow.</p>
-          <Button className="mt-6" onClick={() => router.push("/")}>
+          <Button className="mt-6" onClick={() => router.push("/today")}>
             Return to the system
           </Button>
         </Card>
@@ -133,7 +154,9 @@ export default function ReviewPage() {
           <Label>Daily review</Label>
           <h1 className="type-display mt-2 text-[1.75rem]">Arm the loop.</h1>
           {prefs.hardLines && (
-            <p className="type-mono mt-2 text-[0.75rem] text-muted">{hardLine("arm")}</p>
+            <p className="type-display mt-3 text-[1.125rem] italic leading-snug text-ink/90">
+              &ldquo;{hardLine("arm")}&rdquo;
+            </p>
           )}
           <Card className="mt-6 space-y-5">
             <div>
@@ -196,7 +219,7 @@ export default function ReviewPage() {
             <Label>
               {phase === "student" ? "student · record" : "teacher · judge"} · {area.name}
             </Label>
-            <button onClick={() => router.push("/")} className="text-[0.75rem] text-muted underline hover:text-ink">
+            <button onClick={() => router.push("/today")} className="text-[0.75rem] text-muted underline hover:text-ink">
               exit — draft is kept
             </button>
           </div>
@@ -255,10 +278,20 @@ export default function ReviewPage() {
             </motion.div>
           </AnimatePresence>
 
-          <div className="mt-10 flex items-center justify-between gap-3">
+          <div className="relative mt-10 flex items-center justify-between gap-3">
             <Button variant="ghost" onClick={back} disabled={idx === 0} className="min-w-24">
               Back
             </Button>
+            {crumb && (
+              <span
+                key={crumb.key}
+                className="crumb type-mono pointer-events-none absolute -top-6 right-2 text-[0.8125rem]"
+                style={{ color: "var(--gold)" }}
+                aria-hidden
+              >
+                +{crumb.bp} bp
+              </span>
+            )}
             <Button onClick={next} disabled={!canNext} className="min-w-44">
               {phase === "student" && idx === steps.length - 1
                 ? "Seal the record"
@@ -288,7 +321,22 @@ export default function ReviewPage() {
         />
       )}
 
-      {phase === "commit" && <CommitScreen answers={answers} onDone={() => router.push("/")} />}
+      {phase === "commit" && (
+        <CommitScreen
+          answers={answers}
+          onDone={() => (rankUp ? setShowRankUp(true) : router.push("/today"))}
+        />
+      )}
+
+      {showRankUp && rankUp && (
+        <RankUpTakeover
+          rank={rankUp}
+          onContinue={() => {
+            clearRankUp();
+            router.push("/today");
+          }}
+        />
+      )}
     </Wrap>
   );
 }
@@ -377,12 +425,13 @@ function CommitScreen({ answers, onDone }: { answers: Record<string, AnswerValue
             <span className="text-accent">resolves at the next verdict</span>
           </div>
         </Card>
+        <SealReveal seal={drawSeal(today)} />
         <div className="type-mono mt-5 flex items-center justify-center gap-4 text-[0.75rem] text-muted">
           <span>candor +{candorBp}</span>
           <span>·</span>
           <span>resolve +{resolveBp}</span>
           <span>·</span>
-          <span className="text-ink">
+          <span style={{ color: "var(--gold)" }}>
             balance <CountUp to={balance} /> bp
           </span>
         </div>

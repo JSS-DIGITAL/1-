@@ -6,7 +6,7 @@ import { useApp } from "@/lib/store";
 import { PercentGlyph } from "./ui";
 
 const NAV = [
-  { href: "/", label: "Today" },
+  { href: "/today", label: "Today" },
   { href: "/areas", label: "Areas" },
   { href: "/history", label: "History" },
   { href: "/analytics", label: "Analytics" },
@@ -23,7 +23,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <div className="atmosphere min-h-dvh">
       {/* The spine — desktop */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[76px] flex-col items-center border-r border-line bg-bg/70 py-5 backdrop-blur md:flex">
-        <Link href="/" aria-label="1% — Today">
+        <Link href="/today" aria-label="1% — Today">
           <PercentGlyph />
         </Link>
         <nav className="mt-10 flex flex-col items-center gap-1">
@@ -56,7 +56,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile top band */}
       <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-line bg-bg/80 px-4 backdrop-blur md:hidden">
-        <Link href="/" aria-label="1% — Today">
+        <Link href="/today" aria-label="1% — Today">
           <PercentGlyph size={22} />
         </Link>
         <span className="type-label text-accent" style={{ fontSize: "0.625rem" }}>
