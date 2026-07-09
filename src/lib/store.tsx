@@ -6,24 +6,46 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { generateMock, dayOffset } from "./mock";
-import type { Area, AnswerValue, DayRecord, Mission, MissionOutcome, Mode, Prefs, Recurrence } from "./types";
+import {
+  balanceOf,
+  bountiesFrom,
+  chainFrom,
+  drawSeal,
+  momentumFromChain,
+  rankFor,
+  resolveWager,
+  scoreCandor,
+} from "./economy";
+import type {
+  Area,
+  AnswerValue,
+  DayRecord,
+  LedgerEntry,
+  Mission,
+  MissionOutcome,
+  Mode,
+  Prefs,
+  Recurrence,
+} from "./types";
 
 interface AccentPair {
   accent: string;
   accentInk: string;
   name: string;
+  /** Minimum rank index (economy.RANKS) required to equip. 0 = always. */
+  rankReq: number;
 }
 
 export const ACCENT_PRESETS: Record<Mode, AccentPair[]> = {
   student: [
-    { name: "Moss", accent: "#82bd8b", accentInk: "#0c130e" },
-    { name: "Lichen", accent: "#9fbd7a", accentInk: "#11130a" },
-    { name: "Glacier", accent: "#7fbdb4", accentInk: "#0a1312" },
+    { name: "Moss", accent: "#82bd8b", accentInk: "#0c130e", rankReq: 0 },
+    { name: "Lichen", accent: "#9fbd7a", accentInk: "#11130a", rankReq: 2 },
+    { name: "Glacier", accent: "#7fbdb4", accentInk: "#0a1312", rankReq: 4 },
   ],
   teacher: [
-    { name: "Ember", accent: "#e2734e", accentInk: "#1c0e08" },
-    { name: "Oxblood", accent: "#e06565", accentInk: "#1c0909" },
-    { name: "Brass", accent: "#d9a053", accentInk: "#170f06" },
+    { name: "Ember", accent: "#e2734e", accentInk: "#1c0e08", rankReq: 0 },
+    { name: "Oxblood", accent: "#e06565", accentInk: "#1c0909", rankReq: 2 },
+    { name: "Brass", accent: "#d9a053", accentInk: "#170f06", rankReq: 3 },
   ],
 };
 
@@ -31,6 +53,7 @@ interface AppState {
   areas: Area[];
   records: DayRecord[];
   missions: Mission[];
+  ledger: LedgerEntry[];
   mode: Mode;
   todayDone: boolean;
   pendingS1: boolean | null;
@@ -55,6 +78,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [areas, setAreas] = useState(seed.areas);
   const [records, setRecords] = useState(seed.records);
   const [missions, setMissions] = useState(seed.missions);
+  const [ledger, setLedger] = useState(seed.ledger);
   const [mode, setModeState] = useState<Mode>("student");
   const [todayDone, setTodayDone] = useState(false);
   const [pendingS1, setPendingS1] = useState<boolean | null>(null);
@@ -97,10 +121,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const completeToday = useCallback(
     ({ areaId, kind, answers }: { areaId: string; kind: "full" | "mvd"; answers: Record<string, AnswerValue> }) => {
       const today = dayOffset(0);
+      const newEntries: LedgerEntry[] = [];
 
-      // Rule on yesterday's mission from T1.
+      // Rule on yesterday's mission from T1 — and pay the wager. The chain is
+      // taken before today's verdict lands (the multiplier the bet was riding).
       const t1 = answers.T1;
       if (t1?.kind === "enum") {
+        const standing = missions.find((m) => m.date === today && !m.outcome);
+        if (standing) {
+          const verdict = t1.value as MissionOutcome;
+          const res = resolveWager(standing.confidence, verdict, momentumFromChain(chainFrom(missions)));
+          newEntries.push({
+            date: today,
+            book: "judgment",
+            source: "resolve",
+            bp: res.total,
+            note: `${verdict} · called ${standing.confidence}/10`,
+          });
+        }
         setMissions((ms) =>
           ms.map((m) => (m.date === today && !m.outcome ? { ...m, outcome: t1.value as MissionOutcome } : m))
         );
@@ -132,16 +170,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? { text: t3.note, recurrence: t3.value as Recurrence }
           : undefined;
 
-      setRecords((rs) => [...rs, { date: today, areaId, kind, sealed: true, answers, weakness }]);
+      // Candor pay: the sealed record earns for admission, not achievement.
+      const candor = scoreCandor(answers, kind);
+      newEntries.push({
+        date: today,
+        book: "candor",
+        source: "candor",
+        bp: candor.bp,
+        note: kind === "mvd" ? "minimum day sealed" : "record sealed",
+      });
+
+      setRecords((rs) => [
+        ...rs,
+        { date: today, areaId, kind, sealed: true, answers, weakness, seal: drawSeal(today) },
+      ]);
+      setLedger((l) => [...l, ...newEntries]);
       setTodayDone(true);
     },
-    []
+    [missions]
   );
 
   const value: AppState = {
     areas,
     records,
     missions,
+    ledger,
     mode,
     todayDone,
     pendingS1,
@@ -230,6 +283,37 @@ export function useYesterdayMission(): Mission | undefined {
   const { missions } = useApp();
   const today = dayOffset(0);
   return missions.find((m) => m.date === today && !m.outcome);
+}
+
+/** Everything the economy surfaces need, derived from the three source arrays. */
+export function useEconomy() {
+  const { ledger, missions, records } = useApp();
+  return useMemo(() => {
+    const balance = balanceOf(ledger);
+    const candorTotal = ledger.filter((e) => e.book === "candor").reduce((s, e) => s + e.bp, 0);
+    const judgmentTotal = balance - candorTotal;
+    const chain = chainFrom(missions);
+
+    // Cumulative balance by day, for the balance-history chart.
+    const byDate = new Map<string, number>();
+    for (const e of ledger) byDate.set(e.date, (byDate.get(e.date) ?? 0) + e.bp);
+    const history: number[] = [];
+    for (const d of [...byDate.keys()].sort()) {
+      history.push((history[history.length - 1] ?? 0) + byDate.get(d)!);
+    }
+
+    return {
+      balance,
+      candorTotal,
+      judgmentTotal,
+      chain,
+      momentum: momentumFromChain(chain),
+      rank: rankFor(balance),
+      bounties: bountiesFrom(records),
+      recent: [...ledger].slice(-8).reverse(),
+      history,
+    };
+  }, [ledger, missions, records]);
 }
 
 export function useAreaSeries(areaId: string, metricKey: string): number[] {

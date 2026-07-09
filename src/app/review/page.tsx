@@ -9,10 +9,14 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePrefersReduced } from "@/lib/use-reduced";
 import { QUESTIONS, REVERSE_SHIFT_LINE, studentSteps, teacherSteps } from "@/lib/framework";
-import type { AnswerValue, Question } from "@/lib/types";
-import { useApp, useYesterdayMission } from "@/lib/store";
+import type { AnswerValue, MissionOutcome, Question, ResolveResult } from "@/lib/types";
+import { useApp, useEconomy, useYesterdayMission } from "@/lib/store";
+import { chainFrom, momentumFromChain, resolveWager } from "@/lib/economy";
+import { dayOffset } from "@/lib/mock";
 import { isAnswered, ShapeInput } from "@/components/inputs";
 import { ModeShift } from "@/components/mode-shift";
+import { ResolveCard } from "@/components/economy-ui";
+import { CountUp } from "@/components/charts";
 import { Button, Card, Chip, CompoundRule, Label, ProgressSegments } from "@/components/ui";
 
 type Phase = "arm" | "student" | "shift" | "teacher" | "commit";
@@ -29,6 +33,10 @@ export default function ReviewPage() {
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [idx, setIdx] = useState(0);
   const [dir, setDir] = useState(1);
+  const [resolveResult, setResolveResult] = useState<ResolveResult | null>(null);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const econ = useEconomy();
+  const { missions } = useApp();
 
   const hasMission = Boolean(standing);
   const s1 = answers.S1;
@@ -67,6 +75,21 @@ export default function ReviewPage() {
 
   const next = () => {
     setDir(1);
+
+    // T1 answered: the bet resolves — the Teacher is the payer.
+    if (phase === "teacher" && currentId === "T1" && standing) {
+      const t1 = answers.T1;
+      if (t1?.kind === "enum") {
+        const res = resolveWager(
+          standing.confidence,
+          t1.value as MissionOutcome,
+          momentumFromChain(chainFrom(missions))
+        );
+        setResolveResult(res);
+        setResolveOpen(true);
+      }
+    }
+
     if (idx < steps.length - 1) {
       setIdx(idx + 1);
       return;
@@ -179,7 +202,14 @@ export default function ReviewPage() {
               transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
               className="mt-8"
             >
-              <span className="type-mono text-[0.6875rem] text-accent">{effective.id}</span>
+              <div className="flex items-center gap-3">
+                <span className="type-mono text-[0.6875rem] text-accent">{effective.id}</span>
+                {effective.id === "T5" && (
+                  <span className="type-mono rounded-[3px] border border-accent/60 px-1.5 py-0.5 text-[0.5625rem] uppercase tracking-[0.25em] text-accent">
+                    the wager
+                  </span>
+                )}
+              </div>
               <h2 className="type-display mt-2 text-[1.45rem] leading-snug md:text-[1.75rem]">
                 {effective.prompt}
               </h2>
@@ -193,6 +223,11 @@ export default function ReviewPage() {
                   prevValues={prevS3}
                 />
               </div>
+              {effective.id === "T5" && (
+                <p className="type-mono mt-3 text-[0.6875rem] text-muted">
+                  this call is your stake — it resolves at tomorrow&apos;s verdict. honest is the best play.
+                </p>
+              )}
             </motion.div>
           </AnimatePresence>
 
@@ -217,6 +252,14 @@ export default function ReviewPage() {
       )}
 
       {phase === "shift" && <ModeShift onDone={() => { setIdx(0); setPhase("teacher"); }} />}
+
+      {resolveOpen && resolveResult && (
+        <ResolveCard
+          result={resolveResult}
+          balanceAfter={econ.balance + resolveResult.total}
+          onCollect={() => setResolveOpen(false)}
+        />
+      )}
 
       {phase === "commit" && <CommitScreen answers={answers} onDone={() => router.push("/")} />}
     </Wrap>
@@ -270,12 +313,19 @@ function SealedRecord({ answers, mvd }: { answers: Record<string, AnswerValue>; 
   );
 }
 
-/** Reverse shift: everything falls away except the mission. */
+/** Reverse shift: the mission remains — and the day's earnings are stated. */
 function CommitScreen({ answers, onDone }: { answers: Record<string, AnswerValue>; onDone: () => void }) {
+  const { ledger } = useApp();
   const t4 = answers.T4;
   const t5 = answers.T5;
   const t6 = answers.T6;
   const mission = t4?.kind === "mission" ? t4 : undefined;
+  const today = dayOffset(0);
+  const todays = ledger.filter((e) => e.date === today);
+  const candorBp = todays.filter((e) => e.source === "candor").reduce((s, e) => s + e.bp, 0);
+  const resolveBp = todays.filter((e) => e.source === "resolve").reduce((s, e) => s + e.bp, 0);
+  const balance = ledger.reduce((s, e) => s + e.bp, 0);
+
   return (
     <div className="mx-auto max-w-md pt-8 text-center md:pt-16">
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.42 }}>
@@ -291,10 +341,19 @@ function CommitScreen({ answers, onDone }: { answers: Record<string, AnswerValue
             <p className="mt-3 border-t border-line pt-3 text-[0.8125rem] text-muted">{t6.value}</p>
           )}
           <div className="type-mono mt-4 flex items-center justify-between text-[0.75rem] text-muted">
-            <span>confidence called: {t5?.kind === "scale" ? t5.value : "—"}/10</span>
-            <span className="text-accent">+0.01 filed</span>
+            <span>stake placed: {t5?.kind === "scale" ? t5.value : "—"}/10</span>
+            <span className="text-accent">resolves at the next verdict</span>
           </div>
         </Card>
+        <div className="type-mono mt-5 flex items-center justify-center gap-4 text-[0.75rem] text-muted">
+          <span>candor +{candorBp}</span>
+          <span>·</span>
+          <span>resolve +{resolveBp}</span>
+          <span>·</span>
+          <span className="text-ink">
+            balance <CountUp to={balance} /> bp
+          </span>
+        </div>
         <CompoundRule className="mt-6 opacity-60" />
         <Button className="mt-6" onClick={onDone}>
           Return to the system
@@ -303,3 +362,4 @@ function CommitScreen({ answers, onDone }: { answers: Record<string, AnswerValue
     </div>
   );
 }
+

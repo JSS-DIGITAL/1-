@@ -151,6 +151,27 @@ Shell (spine, mobile bar) · ModeShift overlay · QuestionView · inputs: Binary
 | /analytics | The Teacher's instruments | Follows current state |
 | /settings | Token customisation architecture, preferences | Follows current state |
 
+## 8b · The Economy (added 2026-07-09 — founder decision)
+
+Gamification layer, **premium casino** register: tense, sharp, mono — a trading floor, never a carnival. The prior rule "measurement, never celebration" is superseded by: **measurement *is* the celebration.**
+
+**Currency**: basis points (bp), split into two books — Candor (Student earnings) and Judgment (Teacher earnings). All scoring constants live in `src/lib/economy.ts` (`ECON`).
+
+**Payoff moments & motion spec:**
+
+| Moment | Motion | Reduced motion |
+|---|---|---|
+| The bet resolves (after T1) | ResolveCard flips in (rotateX 60→0, 380ms, swift-out); payout counts up 900ms; dismissed only by a deliberate **Collect** | Static card, same Collect |
+| Commit screen | stake line + candor/resolve/balance ticker (CountUp) | Final values rendered |
+| Dashboard economy strip | balance CountUp on mount; momentum chain links | Final values |
+| Seal draw | stamp appears on the sealed record; rarity by fixed color (standard/brass/ember/oxblood) | Same, static |
+
+**Copy rules for payoffs**: mono type, lowercase system voice, stated not cheered — `resolved: +21 bp`, `bounty collected`, `broken — rebuild it with a kept promise`. No exclamation marks. No praise adjectives.
+
+**Color**: seal rarities use fixed hexes (independent of mode accent) so a rarity reads identically in both modes. Destructive red remains reserved; no economy element uses it.
+
+**Guardrails carried from the framework amendment**: pay for verifiable/anti-flattering/prediction-tested acts only; no negative balances; MVD pays a base; ranks unlock cosmetics only (accent presets are now earned — contrast guardrails still apply on top).
+
 ## 9 · Audit results (run against the built prototype, all screens screenshotted)
 
 | # | Test | Result | Evidence |

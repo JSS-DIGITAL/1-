@@ -60,6 +60,13 @@ export interface Area {
 
 export type Recurrence = "new" | "repeat" | "chronic";
 
+export type SealRarity = "standard" | "brass" | "ember" | "oxblood";
+
+export interface Seal {
+  rarity: SealRarity;
+  label: string;
+}
+
 export interface DayRecord {
   date: string;
   areaId: string;
@@ -67,6 +74,44 @@ export interface DayRecord {
   sealed: boolean;
   answers: Record<string, AnswerValue>;
   weakness?: { text: string; recurrence: Recurrence };
+  seal?: Seal;
+}
+
+// ---- The economy ----
+
+export type LedgerBook = "candor" | "judgment";
+
+export interface LedgerEntry {
+  date: string;
+  book: LedgerBook;
+  source: "candor" | "resolve" | "bounty";
+  bp: number;
+  note: string;
+}
+
+export interface Bounty {
+  text: string;
+  count: number;
+  status: "open" | "killed";
+  lastSeen: string;
+}
+
+export interface RankInfo {
+  name: string;
+  index: number;
+  min: number;
+  next?: { name: string; min: number };
+  /** 0–1 toward the next rank (1 when at top rank). */
+  progress: number;
+}
+
+export interface ResolveResult {
+  confidence: number;
+  outcome: MissionOutcome;
+  executionPay: number;
+  calibrationBonus: number;
+  momentum: number;
+  total: number;
 }
 
 export interface Prefs {

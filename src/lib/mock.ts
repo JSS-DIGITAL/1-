@@ -1,8 +1,10 @@
 // Deterministic 48-day mock history. Seeded PRNG so server and client render
 // identically. The data tells a real story: early overconfidence (9s landing
-// ~50%) improving into calibration, one chronic weakness, metrics trending up.
+// ~50%) improving into calibration, one chronic weakness still open, one
+// killed (bounty paid) — and the ledger earned day by day alongside.
 
-import type { Area, DayRecord, Mission, MissionOutcome } from "./types";
+import type { Area, DayRecord, LedgerEntry, Mission, MissionOutcome } from "./types";
+import { bountiesFrom, drawSeal, ECON, momentumFromChain, resolveWager, scoreCandor } from "./economy";
 
 function mulberry32(a: number) {
   return function () {
@@ -63,11 +65,13 @@ export const AREAS: Area[] = [
   },
 ];
 
-const WEAKNESS_POOL: Record<string, { text: string; weight: number }[]> = {
+// `earlyOnly` weaknesses stop recurring in the late phase — that is how a
+// bounty gets killed in the mock story.
+const WEAKNESS_POOL: Record<string, { text: string; weight: number; earlyOnly?: boolean }[]> = {
   a1: [
     { text: "Avoids high-stakes contacts when energy is low", weight: 5 },
+    { text: "Research runs long as a stall tactic", weight: 4, earlyOnly: true },
     { text: "Starts the day in email instead of calls", weight: 3 },
-    { text: "Research runs long as a stall tactic", weight: 2 },
     { text: "Follow-ups drift past 48 hours", weight: 1 },
   ],
   a2: [
@@ -119,17 +123,20 @@ export interface MockData {
   areas: Area[];
   records: DayRecord[];
   missions: Mission[];
+  ledger: LedgerEntry[];
 }
 
 export function generateMock(): MockData {
   const rand = mulberry32(20260709);
   const records: DayRecord[] = [];
   const missions: Mission[] = [];
+  const ledger: LedgerEntry[] = [];
   const weaknessCount: Record<string, number> = {};
+  let chain = 0; // consecutive kept promises
 
   const pick = <T,>(arr: T[]): T => arr[Math.floor(rand() * arr.length)];
-  const weighted = (areaId: string) => {
-    const pool = WEAKNESS_POOL[areaId];
+  const weighted = (areaId: string, phase: "early" | "late") => {
+    const pool = WEAKNESS_POOL[areaId].filter((w) => phase === "early" || !w.earlyOnly);
     const total = pool.reduce((s, w) => s + w.weight, 0);
     let r = rand() * total;
     for (const w of pool) {
@@ -143,7 +150,7 @@ export function generateMock(): MockData {
 
   for (let i = 48; i >= 1; i--) {
     const date = dayOffset(-i);
-    const phase = i > 24 ? "early" : "late"; // calibration story
+    const phase = i > 24 ? "early" : "late";
     const skip = rand() < (phase === "early" ? 0.12 : 0.05);
 
     if (skip) {
@@ -151,6 +158,7 @@ export function generateMock(): MockData {
       if (pendingMission) {
         pendingMission.outcome = "failed";
         pendingMission = null;
+        chain = 0;
       }
       continue;
     }
@@ -159,16 +167,25 @@ export function generateMock(): MockData {
     const areaId = r < 0.55 ? "a1" : r < 0.82 ? "a2" : "a3";
     const mvd = rand() < (phase === "early" ? 0.18 : 0.08);
 
-    // Rule on the pending mission (this day's S1/T1).
+    // Rule on the pending mission (this day's S1/T1) — and pay the wager.
     let outcome: MissionOutcome | undefined;
     if (pendingMission) {
       const pExec = phase === "early" ? 0.5 : 0.74;
       const roll = rand();
       outcome = roll < pExec ? "executed" : roll < pExec + 0.16 ? "partial" : "failed";
       pendingMission.outcome = outcome;
+      const res = resolveWager(pendingMission.confidence, outcome, momentumFromChain(chain));
+      ledger.push({
+        date,
+        book: "judgment",
+        source: "resolve",
+        bp: res.total,
+        note: `${outcome} · called ${pendingMission.confidence}/10`,
+      });
+      chain = outcome === "executed" ? chain + 1 : 0;
     }
 
-    // Commit tomorrow's mission (except: none on the final generated day for "today" — we DO want yesterday's mission for today, unjudged).
+    // Commit tomorrow's mission (yesterday's commit becomes today's standing one).
     const conf =
       phase === "early" ? 8 + Math.floor(rand() * 2) : 5 + Math.floor(rand() * 4);
     const mTemplate = pick(MISSION_POOL[areaId]);
@@ -182,7 +199,7 @@ export function generateMock(): MockData {
     };
     missions.push(mission);
 
-    const weakness = weighted(areaId);
+    const weakness = weighted(areaId, phase);
     weaknessCount[weakness] = (weaknessCount[weakness] ?? 0) + 1;
     const recurrence =
       weaknessCount[weakness] >= 3 ? "chronic" : weaknessCount[weakness] === 2 ? "repeat" : "new";
@@ -204,6 +221,7 @@ export function generateMock(): MockData {
       areaId,
       kind: mvd ? "mvd" : "full",
       sealed: true,
+      seal: drawSeal(date),
       answers: {
         ...(outcome
           ? {
@@ -232,8 +250,32 @@ export function generateMock(): MockData {
       weakness: mvd ? undefined : { text: weakness, recurrence },
     };
     records.push(record);
+
+    const candor = scoreCandor(record.answers, record.kind);
+    ledger.push({
+      date,
+      book: "candor",
+      source: "candor",
+      bp: candor.bp,
+      note: record.kind === "mvd" ? "minimum day sealed" : "record sealed",
+    });
+
     pendingMission = mission;
   }
 
-  return { areas: AREAS, records, missions };
+  // Pay any bounty the history has already killed (chronic weakness gone
+  // quiet for the kill window).
+  for (const b of bountiesFrom(records)) {
+    if (b.status === "killed") {
+      ledger.push({
+        date: dayOffset(-1),
+        book: "judgment",
+        source: "bounty",
+        bp: ECON.bountyPay,
+        note: `bounty collected: ${b.text}`,
+      });
+    }
+  }
+
+  return { areas: AREAS, records, missions, ledger };
 }

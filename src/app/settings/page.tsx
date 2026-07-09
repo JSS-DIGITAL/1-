@@ -5,7 +5,9 @@
 
 import { Shell } from "@/components/shell";
 import { Button, Card, Label } from "@/components/ui";
-import { ACCENT_PRESETS, useApp } from "@/lib/store";
+import { RankBadge } from "@/components/economy-ui";
+import { RANKS } from "@/lib/economy";
+import { ACCENT_PRESETS, useApp, useEconomy } from "@/lib/store";
 import type { Mode } from "@/lib/types";
 
 const MODE_BG: Record<Mode, string> = { student: "#0f1411", teacher: "#150f10" };
@@ -26,10 +28,11 @@ function contrast(a: string, b: string): number {
 }
 
 export default function SettingsPage() {
-  const { mode, setMode, accents, setAccent, prefs, setPrefs, records, missions, areas } = useApp();
+  const { mode, setMode, accents, setAccent, prefs, setPrefs, records, missions, areas, ledger } = useApp();
+  const econ = useEconomy();
 
   const exportData = () => {
-    const blob = new Blob([JSON.stringify({ areas, records, missions }, null, 2)], {
+    const blob = new Blob([JSON.stringify({ areas, records, missions, ledger }, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -46,6 +49,14 @@ export default function SettingsPage() {
       <h1 className="type-display mt-1 text-[1.75rem] md:text-[2.25rem]">The instrument panel.</h1>
 
       <div className="mt-6 grid max-w-3xl gap-[var(--gap)]">
+        <Card>
+          <Label className="mb-3">Rank</Label>
+          <RankBadge rank={econ.rank} balance={econ.balance} />
+          <p className="mt-3 text-[0.75rem] text-muted">
+            Ranks unlock cosmetics only — accents and seals. Nothing about the loop is purchasable.
+          </p>
+        </Card>
+
         <Card>
           <Label className="mb-3">Mode preview</Label>
           <p className="mb-3 text-[0.8125rem] text-muted">
@@ -71,13 +82,14 @@ export default function SettingsPage() {
             <Label className="mb-3">{m} accent</Label>
             <p className="mb-3 text-[0.8125rem] text-muted">
               Swaps route through tokens with contrast guardrails — pairs under 4.5:1 against the {m} ground
-              are not offered.
+              are not offered. Higher accents are earned, not bought.
             </p>
             <div className="flex flex-wrap gap-2">
               {ACCENT_PRESETS[m].map((p) => {
                 const cr = contrast(p.accent, MODE_BG[m]);
                 const active = accents[m].accent === p.accent;
-                const legal = cr >= 4.5;
+                const unlocked = econ.rank.index >= p.rankReq;
+                const legal = cr >= 4.5 && unlocked;
                 return (
                   <button
                     key={p.name}
@@ -89,7 +101,9 @@ export default function SettingsPage() {
                   >
                     <span className="h-4 w-4 rounded-full" style={{ background: p.accent }} />
                     <span className="text-ink">{p.name}</span>
-                    <span className="type-mono text-[0.6875rem] text-muted">{cr.toFixed(1)}:1</span>
+                    <span className="type-mono text-[0.6875rem] text-muted">
+                      {unlocked ? `${cr.toFixed(1)}:1` : `unlocks at ${RANKS[p.rankReq].name}`}
+                    </span>
                   </button>
                 );
               })}

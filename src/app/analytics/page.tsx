@@ -4,12 +4,14 @@
 // Teacher would ask. Metrics come from the framework's metadata schema.
 
 import { Shell } from "@/components/shell";
-import { CalibrationPlot, CompoundCurve, CountUp, DensityStrip, RecurrenceBars } from "@/components/charts";
+import { CalibrationPlot, CompoundCurve, CountUp, DensityStrip, RecurrenceBars, Sparkline } from "@/components/charts";
+import { BountyCard } from "@/components/economy-ui";
 import { Card, Label, StatTile } from "@/components/ui";
-import { useAnalytics } from "@/lib/store";
+import { useAnalytics, useEconomy } from "@/lib/store";
 
 export default function AnalyticsPage() {
   const a = useAnalytics();
+  const econ = useEconomy();
   const fullDays = a.density.filter((d) => d.kind === "full").length;
   const mvdDays = a.density.filter((d) => d.kind === "mvd").length;
 
@@ -38,6 +40,52 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="mt-[var(--gap)] grid gap-[var(--gap)] lg:grid-cols-2">
+        <Card>
+          <Label className="mb-1">Are you honest, and are you right?</Label>
+          <p className="mb-4 text-[0.8125rem] text-muted">
+            The two books. Candor pays the Student for admission; Judgment pays the Teacher for verdicts,
+            calibration and kills.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="mb-1">Candor</Label>
+              <div className="type-mono text-[1.6rem] leading-none">{econ.candorTotal}<span className="ml-1 text-[0.75rem] text-muted">bp</span></div>
+            </div>
+            <div>
+              <Label className="mb-1">Judgment</Label>
+              <div className="type-mono text-[1.6rem] leading-none">{econ.judgmentTotal}<span className="ml-1 text-[0.75rem] text-muted">bp</span></div>
+            </div>
+          </div>
+          <div className="mt-4 border-t border-line pt-3">
+            <Label className="mb-2">Balance history</Label>
+            <Sparkline data={econ.history} width={300} height={44} />
+          </div>
+          <div className="type-mono mt-3 space-y-1 border-t border-line pt-3 text-[0.6875rem] text-muted">
+            {econ.recent.slice(0, 4).map((e, i) => (
+              <div key={i} className="flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate">{e.note}</span>
+                <span className="shrink-0 text-ink">+{e.bp}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
+          <Label className="mb-1">What are you hunting?</Label>
+          <p className="mb-4 text-[0.8125rem] text-muted">
+            Chronic weaknesses carry bounties. A bounty dies when the weakness stays silent for 14 days —
+            corrections are the weapon.
+          </p>
+          <div className="space-y-3">
+            {econ.bounties.map((b) => (
+              <BountyCard key={b.text} bounty={b} />
+            ))}
+            {econ.bounties.length === 0 && (
+              <p className="text-[0.8125rem] text-muted">No chronic weaknesses on the board.</p>
+            )}
+          </div>
+        </Card>
+
         <Card>
           <Label className="mb-1">Is your word data?</Label>
           <p className="mb-4 text-[0.8125rem] text-muted">

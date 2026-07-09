@@ -6,6 +6,8 @@
 import { useMemo, useState } from "react";
 import { Shell } from "@/components/shell";
 import { Button, Card, Chip, Label } from "@/components/ui";
+import { SealStamp, SEAL_COLORS } from "@/components/economy-ui";
+import { SEAL_ORDER } from "@/lib/economy";
 import { useApp } from "@/lib/store";
 import { dayOffset } from "@/lib/mock";
 import type { AnswerValue } from "@/lib/types";
@@ -61,6 +63,21 @@ export default function HistoryPage() {
             <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full border border-accent/80" /> minimum</span>
             <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-line" /> none</span>
           </div>
+
+          <div className="mt-3 border-t border-line pt-3">
+            <Label className="mb-2">Seal collection</Label>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              {SEAL_ORDER.map((rarity) => {
+                const n = records.filter((r) => r.seal?.rarity === rarity).length;
+                return (
+                  <span key={rarity} className="type-mono flex items-center gap-1.5 text-[0.6875rem]" style={{ color: SEAL_COLORS[rarity] }}>
+                    <SealStamp seal={{ rarity, label: rarity }} size={18} />
+                    {n}× {rarity}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
         </Card>
 
         {record ? (
@@ -70,9 +87,18 @@ export default function HistoryPage() {
                 <Label>{record.date}</Label>
                 <h2 className="type-display mt-1 text-[1.375rem]">{area?.name}</h2>
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Chip>{record.kind === "mvd" ? "minimum day" : "full review"}</Chip>
-                <Chip tone="accent">sealed</Chip>
+                {record.seal ? (
+                  <span className="flex items-center gap-1.5">
+                    <SealStamp seal={record.seal} size={30} />
+                    <span className="type-mono text-[0.625rem] uppercase tracking-[0.15em]" style={{ color: SEAL_COLORS[record.seal.rarity] }}>
+                      {record.seal.rarity}
+                    </span>
+                  </span>
+                ) : (
+                  <Chip tone="accent">sealed</Chip>
+                )}
               </div>
             </div>
 

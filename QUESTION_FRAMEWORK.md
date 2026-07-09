@@ -229,7 +229,7 @@ Categories that would corrupt the system, each with the reason it is poison here
 8. **Affirmations / manifestation prompts** ("Visualise your success") — belief without evidence is the exact delusion this system exists to kill.
 9. **Comparison-to-others questions** ("Are you ahead of your peers?") — the only sanctioned opponent is the previous self; social comparison imports noise and ego.
 10. **Advice-to-past-self prompts** ("What would you tell yourself a year ago?") — nostalgia theatre; produces wisdom-flavoured text with zero forward action.
-11. **Streak worship** ("Don't break the chain!") — attendance is not improvement; consistency is measured (record density) but never gamified into guilt.
+11. **Attendance-streak worship** ("Don't break the chain of showing up!") — attendance is not improvement; record density is measured but never guilt-gamified. *(Amended by §11: a momentum chain of __kept promises__ — consecutive executed missions — is permitted, because it rewards doing what you said, not showing up. Attendance streaks remain banned.)*
 12. **Open brainstorms** ("List everything you could improve") — breadth destroys the one-weakness, one-mission discipline that makes the loop executable.
 
 ---
@@ -462,6 +462,21 @@ All pass verbatim — no domain-specific rewording required.
 | — (addition) | **MVD tagging + weekly surfacing** | The brief requires an MVD; tagging prevents the MVD from silently becoming the product. |
 
 ---
+
+## 11 · Amendment (2026-07-09): The Economy
+
+**Founder decision, deliberately reversing the launch guardrail:** 1% now carries a heavy incentive layer ("the economy") to drive landing and retention. The questions above are unchanged; the economy attaches to their outputs. Its law, which protects the system's honesty engine:
+
+> **Pay only for what is verifiable, anti-flattering, or prediction-tested — never for claimed success alone.**
+
+- **The Wager**: T5's confidence call is a stake; the next day's T1 verdict resolves it under a proper-scoring-flavored payout, so the honest call is always the best play. The dopamine mechanism and the calibration mechanism are the same feature.
+- **Candor pay**: the Student earns for admission, not achievement — naming an avoidance (S4) pays; "nothing" pays zero. Honest answering is now literally more rewarding than flattering answering (this operationalises the §5 hunting target directly).
+- **Momentum**: a multiplier chain of kept promises (executed missions), broken by a failed verdict or an unjudged day — see the amended Must-Not-Exist #11.
+- **Bounties**: chronic weaknesses (T3, 3+ flags) carry bounties, paid when the weakness stays silent for 14 days — corrections are the weapon.
+- **Seals, ranks, cosmetics**: variable-ratio seal draws reward the act of sealing; ranks unlock cosmetics only. No mechanic is purchasable.
+- **Unchanged protections**: no negative balances, no shame copy, MVD still pays a base (thin record beats no record), and the currency — basis points — never touches question content or ordering.
+
+**Known residual risk** (accepted for prototype): self-report gaming cannot be fully prevented in a solo product; the calibration scoring and evidence audits are mitigation, not proof.
 
 ## Definition-of-done check
 

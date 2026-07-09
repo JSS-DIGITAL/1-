@@ -9,13 +9,16 @@ import { useRouter } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Button, Card, Chip, CompoundRule, Label, StatTile } from "@/components/ui";
 import { DensityStrip, Sparkline } from "@/components/charts";
-import { useAnalytics, useApp, useAreaSeries, useYesterdayMission } from "@/lib/store";
+import { BalanceTicker, BountyCard, MomentumMeter, RankBadge } from "@/components/economy-ui";
+import { useAnalytics, useApp, useAreaSeries, useEconomy, useYesterdayMission } from "@/lib/store";
 
 export default function Dashboard() {
   const router = useRouter();
   const { areas, todayDone, setPendingS1, missions } = useApp();
   const standing = useYesterdayMission();
   const analytics = useAnalytics();
+  const econ = useEconomy();
+  const openBounty = econ.bounties.find((b) => b.status === "open");
   const today = new Date();
 
   const answerMission = (v: boolean) => {
@@ -38,14 +41,21 @@ export default function Dashboard() {
         {todayDone && <Chip tone="accent">+0.01 filed</Chip>}
       </div>
 
-      <div className="mt-7 grid gap-[var(--gap)] lg:grid-cols-[1.6fr_1fr]">
+      {/* The economy strip: balance, rank, momentum. */}
+      <Card className="mt-6 grid gap-6 md:grid-cols-3">
+        <BalanceTicker balance={econ.balance} />
+        <RankBadge rank={econ.rank} balance={econ.balance} />
+        <MomentumMeter chain={econ.chain} momentum={econ.momentum} />
+      </Card>
+
+      <div className="mt-[var(--gap)] grid gap-[var(--gap)] lg:grid-cols-[1.6fr_1fr]">
         {/* The most important widget in the app */}
         {!todayDone && standing ? (
           <Card rule className="flex flex-col">
             <div className="flex items-center justify-between gap-3">
               <Label>The standing mission</Label>
               <span className="type-mono text-[0.75rem] text-muted">
-                confidence called: {standing.confidence}/10
+                stake riding: <span className="text-accent">{standing.confidence}/10</span>
               </span>
             </div>
             <div className="type-mono mt-3 flex items-center gap-3 text-[0.75rem] text-accent">
@@ -58,7 +68,10 @@ export default function Dashboard() {
             <p className="type-display mt-2 text-[1.375rem] leading-snug md:text-[1.6rem]">{standing.what}</p>
             {standing.ifThen && <p className="mt-2 text-[0.8125rem] text-muted">{standing.ifThen}</p>}
             <div className="mt-5 border-t border-line pt-4">
-              <Label className="mb-2.5">Did you do it?</Label>
+              <div className="mb-2.5 flex items-baseline justify-between gap-3">
+                <Label>Did you do it?</Label>
+                <span className="type-mono text-[0.6875rem] text-muted">the bet resolves at review</span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <Button onClick={() => answerMission(true)}>Yes — begin review</Button>
                 <Button variant="ghost" onClick={() => answerMission(false)}>
@@ -101,6 +114,12 @@ export default function Dashboard() {
           />
         </div>
       </div>
+
+      {openBounty && (
+        <div className="mt-[var(--gap)]">
+          <BountyCard bounty={openBounty} />
+        </div>
+      )}
 
       <div className="mt-[var(--gap)] grid gap-[var(--gap)] md:grid-cols-3">
         {areas.map((a) => (
