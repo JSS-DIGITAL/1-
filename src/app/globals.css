@@ -1,26 +1,186 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   1% token system — two states of one instrument.
+   Student = observatory (green-graphite, air, soft serif).
+   Teacher = review chamber (ember-graphite, density, hard serif).
+   Every visual decision routes through these tokens; the mode
+   flips by [data-mode] on <html>. See DESIGN_SYSTEM.md.
+   ============================================================ */
+
+:root,
+[data-mode="student"] {
+  --bg: #0f1411;
+  --surface: #161d18;
+  --surface-2: #1c241e;
+  --line: #26332a;
+  --ink: #e6ede4;
+  --muted: #93a796;
+  --accent: #82bd8b;
+  --accent-ink: #0c130e;
+  --destructive: #ff4d42;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --pad-card: 24px;
+  --gap: 16px;
+  --lh: 1.6;
+
+  --display-wght: 430;
+  --display-soft: 100;
+
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 420ms;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-mode="teacher"] {
+  --bg: #150f10;
+  --surface: #1e1517;
+  --surface-2: #251a1c;
+  --line: #382528;
+  --ink: #f0e7e3;
+  --muted: #ac9088;
+  --accent: #e2734e;
+  --accent-ink: #1c0e08;
+
+  --radius: 5px;
+  --radius-sm: 3px;
+  --pad-card: 18px;
+  --gap: 12px;
+  --lh: 1.45;
+
+  --display-wght: 620;
+  --display-soft: 0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-destructive: var(--destructive);
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --radius-mode: var(--radius);
+  --radius-mode-sm: var(--radius-sm);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: var(--lh);
+  font-size: 15px;
+}
+
+/* Temperature crossfade — the token half of the Mode Shift.
+   Structural properties (radius, spacing) snap; color breathes. */
+.mode-fade,
+.mode-fade * {
+  transition:
+    background-color 640ms ease-in-out,
+    border-color 640ms ease-in-out,
+    color 640ms ease-in-out,
+    fill 640ms ease-in-out,
+    stroke 640ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mode-fade,
+  .mode-fade * {
+    transition: none;
+  }
+}
+
+/* Display face: the mode lives in Fraunces' SOFT axis + weight. */
+.type-display {
+  font-family: var(--font-display);
+  font-weight: var(--display-wght);
+  font-variation-settings:
+    "SOFT" var(--display-soft),
+    "WONK" 0,
+    "opsz" 34;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.type-label {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.type-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Grain atmosphere — kills the flat near-black look. */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* Ambient ground: a slow radial wash, per-mode via tokens. */
+.atmosphere {
+  background:
+    radial-gradient(1100px 700px at 78% -10%, color-mix(in oklab, var(--accent) 7%, transparent), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, color-mix(in oklab, var(--accent) 4%, transparent), transparent 55%),
+    var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise var(--dur-slow) var(--ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
 }
