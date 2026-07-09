@@ -31,6 +31,17 @@ export function dayOffset(offset: number): string {
 
 export const AREAS: Area[] = [
   {
+    id: "a0",
+    name: "Universal",
+    goal: "Get 1% better at the thing only you know about",
+    metrics: [
+      { key: "focus", label: "Focused minutes", unit: "min" },
+      { key: "shipped", label: "Outputs shipped", unit: "items" },
+    ],
+    standards: ["Show up. Record. Correct."],
+    createdAt: dayOffset(-48),
+  },
+  {
     id: "a1",
     name: "Sales outreach",
     goal: "10 discovery calls booked per month",
@@ -68,6 +79,11 @@ export const AREAS: Area[] = [
 // `earlyOnly` weaknesses stop recurring in the late phase — that is how a
 // bounty gets killed in the mock story.
 const WEAKNESS_POOL: Record<string, { text: string; weight: number; earlyOnly?: boolean }[]> = {
+  a0: [
+    { text: "Starts the day without a named target", weight: 4 },
+    { text: "Confuses planning with doing", weight: 3 },
+    { text: "Lets the phone set the agenda", weight: 2 },
+  ],
   a1: [
     { text: "Avoids high-stakes contacts when energy is low", weight: 5 },
     { text: "Research runs long as a stall tactic", weight: 4, earlyOnly: true },
@@ -86,6 +102,10 @@ const WEAKNESS_POOL: Record<string, { text: string; weight: number; earlyOnly?: 
 };
 
 const MISSION_POOL: Record<string, { when: string; where: string; what: string }[]> = {
+  a0: [
+    { when: "7:00", where: "desk", what: "One hour on the single most avoided task, phone in another room" },
+    { when: "6:30", where: "anywhere quiet", what: "Name the day's one output and finish it before noon" },
+  ],
   a1: [
     { when: "6:00", where: "desk", what: "Call the three largest prospects before opening email" },
     { when: "9:00", where: "desk", what: "12 cold calls, hard list first, no email until done" },
@@ -164,7 +184,7 @@ export function generateMock(): MockData {
     }
 
     const r = rand();
-    const areaId = r < 0.55 ? "a1" : r < 0.82 ? "a2" : "a3";
+    const areaId = r < 0.12 ? "a0" : r < 0.6 ? "a1" : r < 0.84 ? "a2" : "a3";
     const mvd = rand() < (phase === "early" ? 0.18 : 0.08);
 
     // Rule on the pending mission (this day's S1/T1) — and pay the wager.
@@ -211,7 +231,8 @@ export function generateMock(): MockData {
       const base =
         m.key === "calls" ? 8 + progress * 6 : m.key === "booked" ? 1 + progress * 1.6
         : m.key === "volume" ? 4800 + progress * 900 : m.key === "sets" ? 12 + progress * 4
-        : m.key === "minutes" ? 20 + progress * 18 : 6 + progress * 8;
+        : m.key === "minutes" ? 20 + progress * 18 : m.key === "focus" ? 35 + progress * 30
+        : m.key === "shipped" ? 1 + progress * 2 : 6 + progress * 8;
       values[m.key] = Math.round(base + (rand() - 0.5) * base * 0.25);
     }
 

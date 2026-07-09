@@ -2,7 +2,7 @@
 
 // Improvement areas — campaigns, each with its own goal, standards and metrics.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Shell } from "@/components/shell";
 import { Sparkline } from "@/components/charts";
 import { Button, Card, Chip, Label } from "@/components/ui";
@@ -15,6 +15,13 @@ const fieldCls =
 export default function AreasPage() {
   const { areas, records, addArea } = useApp();
   const [adding, setAdding] = useState(false);
+
+  // /areas?new=1 opens the form directly (the dashboard + arm-screen add links).
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("new")) return;
+    const t = setTimeout(() => setAdding(true), 0);
+    return () => clearTimeout(t);
+  }, []);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
   const [metric, setMetric] = useState("");

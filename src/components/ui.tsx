@@ -37,7 +37,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-[var(--radius)] border border-line bg-surface p-[var(--pad-card)] ${
+      className={`sheen rounded-[var(--radius)] border border-line bg-surface p-[var(--pad-card)] ${
         rule ? "border-l-2 border-l-accent" : ""
       } ${className}`}
     >

@@ -1,23 +1,24 @@
 @import "tailwindcss";
 
 /* ============================================================
-   1% token system — two states of one instrument.
-   Student = observatory (green-graphite, air, soft serif).
-   Teacher = review chamber (ember-graphite, density, hard serif).
-   Every visual decision routes through these tokens; the mode
-   flips by [data-mode] on <html>. See DESIGN_SYSTEM.md.
+   1% token system — premium pass.
+   One near-black instrument; the mode accent is a SIGNAL, not a
+   wash. Student = emerald on black (record). Teacher = blood red
+   on black (judgement). Money is always gold, in both modes.
+   All pairs script-validated ≥ 4.5:1. See DESIGN_SYSTEM.md.
    ============================================================ */
 
 :root,
 [data-mode="student"] {
-  --bg: #0f1411;
-  --surface: #161d18;
-  --surface-2: #1c241e;
-  --line: #26332a;
-  --ink: #e6ede4;
-  --muted: #93a796;
-  --accent: #82bd8b;
-  --accent-ink: #0c130e;
+  --bg: #0a0c0b;
+  --surface: #111514;
+  --surface-2: #161b19;
+  --line: #232a27;
+  --ink: #e9edea;
+  --muted: #8fa098;
+  --accent: #45b683;
+  --accent-ink: #08120c;
+  --gold: #d3ae64;
   --destructive: #ff4d42;
 
   --radius: 14px;
@@ -26,8 +27,9 @@
   --gap: 16px;
   --lh: 1.6;
 
-  --display-wght: 430;
+  --display-wght: 380;
   --display-soft: 100;
+  --display-track: -0.005em;
 
   --dur-fast: 140ms;
   --dur-base: 240ms;
@@ -36,14 +38,15 @@
 }
 
 [data-mode="teacher"] {
-  --bg: #150f10;
-  --surface: #1e1517;
-  --surface-2: #251a1c;
-  --line: #382528;
-  --ink: #f0e7e3;
-  --muted: #ac9088;
-  --accent: #e2734e;
-  --accent-ink: #1c0e08;
+  --bg: #0d0a0b;
+  --surface: #151112;
+  --surface-2: #1b1516;
+  --line: #2d2224;
+  --ink: #f0eae8;
+  --muted: #a38f8d;
+  --accent: #ed5656;
+  --accent-ink: #180808;
+  --gold: #d3ae64;
 
   --radius: 5px;
   --radius-sm: 3px;
@@ -51,8 +54,9 @@
   --gap: 12px;
   --lh: 1.45;
 
-  --display-wght: 620;
+  --display-wght: 680;
   --display-soft: 0;
+  --display-track: -0.02em;
 }
 
 @theme inline {
@@ -64,6 +68,7 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-gold: var(--gold);
   --color-destructive: var(--destructive);
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-body: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
@@ -83,8 +88,7 @@ body {
   font-size: 15px;
 }
 
-/* Temperature crossfade — the token half of the Mode Shift.
-   Structural properties (radius, spacing) snap; color breathes. */
+/* Temperature crossfade — applied only during a mode shift. */
 .mode-fade,
 .mode-fade * {
   transition:
@@ -102,7 +106,7 @@ body {
   }
 }
 
-/* Display face: the mode lives in Fraunces' SOFT axis + weight. */
+/* Display face: the mode lives in Fraunces' SOFT axis, weight and tracking. */
 .type-display {
   font-family: var(--font-display);
   font-weight: var(--display-wght);
@@ -110,7 +114,7 @@ body {
     "SOFT" var(--display-soft),
     "WONK" 0,
     "opsz" 34;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--display-track);
   text-wrap: balance;
 }
 
@@ -127,23 +131,40 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Grain atmosphere — kills the flat near-black look. */
+/* Grain atmosphere. */
 .grain::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 60;
-  opacity: 0.05;
+  opacity: 0.045;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
 }
 
-/* Ambient ground: a slow radial wash, per-mode via tokens. */
+/* Ambient ground. Student: soft observatory wash. Teacher: a hard,
+   narrow diagonal sheen — structure carries the mode, not hue. */
 .atmosphere {
   background:
-    radial-gradient(1100px 700px at 78% -10%, color-mix(in oklab, var(--accent) 7%, transparent), transparent 60%),
-    radial-gradient(900px 600px at -10% 110%, color-mix(in oklab, var(--accent) 4%, transparent), transparent 55%),
+    radial-gradient(1100px 700px at 78% -10%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, color-mix(in oklab, var(--accent) 3%, transparent), transparent 55%),
     var(--bg);
+}
+
+[data-mode="teacher"] .atmosphere {
+  background:
+    linear-gradient(115deg, transparent 42%, color-mix(in oklab, var(--accent) 5%, transparent) 50%, transparent 58%),
+    radial-gradient(900px 500px at 85% -15%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 55%),
+    var(--bg);
+}
+
+/* Premium card sheen: hairline + faint top light. */
+.sheen {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--ink) 4%, transparent),
+    transparent 22%
+  );
 }
 
 :focus-visible {
@@ -164,6 +185,10 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+textarea {
+  field-sizing: content;
 }
 
 @keyframes rise {

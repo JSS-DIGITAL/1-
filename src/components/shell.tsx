@@ -13,6 +13,8 @@ const NAV = [
   { href: "/settings", label: "Settings" },
 ];
 
+export const MODE_BANNER = { student: "student · record", teacher: "teacher · judge" } as const;
+
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { mode } = useApp();
@@ -46,7 +48,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             className="type-label text-muted/60"
             style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", fontSize: "0.625rem" }}
           >
-            {mode}
+            {MODE_BANNER[mode]}
           </span>
           <span className={`block h-8 w-[3px] rounded-full bg-accent`} aria-hidden />
         </div>
@@ -58,7 +60,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <PercentGlyph size={22} />
         </Link>
         <span className="type-label text-accent" style={{ fontSize: "0.625rem" }}>
-          {mode}
+          {MODE_BANNER[mode]}
         </span>
       </header>
 

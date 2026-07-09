@@ -118,4 +118,6 @@ export interface Prefs {
   rotation: boolean;
   deepTier: boolean;
   sound: boolean;
+  /** Aggressive one-liners in the chrome. Never inside questions or payouts. */
+  hardLines: boolean;
 }

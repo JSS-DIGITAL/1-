@@ -117,11 +117,12 @@ export function scoreCandor(
 
 // ---- Seals: variable-ratio reward on the honest act of sealing ----
 
+// Metals, not mode colours — money and trophies read the same in both rooms.
 const SEAL_TABLE: { rarity: SealRarity; label: string; weight: number }[] = [
-  { rarity: "standard", label: "Standard seal", weight: 70 },
-  { rarity: "brass", label: "Brass seal", weight: 20 },
-  { rarity: "ember", label: "Ember seal", weight: 8 },
-  { rarity: "oxblood", label: "Oxblood seal", weight: 2 },
+  { rarity: "standard", label: "Silver seal", weight: 70 },
+  { rarity: "brass", label: "Bronze seal", weight: 20 },
+  { rarity: "ember", label: "Gold seal", weight: 8 },
+  { rarity: "oxblood", label: "Obsidian seal", weight: 2 },
 ];
 
 /** Deterministic per-date draw (hydration- and reload-safe). */

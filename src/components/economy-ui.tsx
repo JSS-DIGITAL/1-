@@ -9,11 +9,19 @@ import type { Bounty, RankInfo, ResolveResult, Seal, SealRarity } from "@/lib/ty
 import { Button, Card, Label } from "./ui";
 import { CountUp } from "./charts";
 
+// Seal metals — fixed hexes, validated ≥4.5:1 on both mode surfaces.
 export const SEAL_COLORS: Record<SealRarity, string> = {
-  standard: "#8a8f87",
-  brass: "#d9a053",
-  ember: "#e2734e",
-  oxblood: "#c04a63",
+  standard: "#9ba1a6", // silver
+  brass: "#b08a50", // bronze
+  ember: "#d3ae64", // gold
+  oxblood: "#c27a93", // obsidian sheen
+};
+
+export const SEAL_NAMES: Record<SealRarity, string> = {
+  standard: "silver",
+  brass: "bronze",
+  ember: "gold",
+  oxblood: "obsidian",
 };
 
 export function SealStamp({ seal, size = 40 }: { seal: Seal; size?: number }) {
@@ -35,7 +43,7 @@ export function BalanceTicker({ balance, label = "balance" }: { balance: number;
   return (
     <div>
       <Label>{label}</Label>
-      <div className="type-mono mt-1 text-[2rem] leading-none text-ink">
+      <div className="type-mono mt-1 text-[2rem] leading-none text-gold">
         <CountUp to={balance} /> <span className="text-[0.875rem] text-muted">bp</span>
       </div>
     </div>
@@ -47,13 +55,13 @@ export function MomentumMeter({ chain, momentum }: { chain: number; momentum: nu
     <div>
       <div className="flex items-baseline justify-between gap-3">
         <Label>momentum</Label>
-        <span className="type-mono text-[0.8125rem] text-accent">×{momentum.toFixed(1)}</span>
+        <span className="type-mono text-[0.8125rem] text-gold">×{momentum.toFixed(1)}</span>
       </div>
       <div className="mt-2 flex gap-1" aria-label={`${chain} kept promises in a row`}>
         {Array.from({ length: 10 }, (_, i) => (
           <span
             key={i}
-            className={`h-3 w-3 -skew-x-12 rounded-[2px] ${i < Math.min(chain, 10) ? "bg-accent" : "bg-line"}`}
+            className={`h-3 w-3 -skew-x-12 rounded-[2px] ${i < Math.min(chain, 10) ? "bg-gold" : "bg-line"}`}
           />
         ))}
       </div>
@@ -77,7 +85,7 @@ export function BountyCard({ bounty }: { bounty: Bounty }) {
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <span className={`type-mono text-[1.25rem] ${killed ? "text-muted line-through" : "text-accent"}`}>
+          <span className={`type-mono text-[1.25rem] ${killed ? "text-muted line-through" : "text-gold"}`}>
             100
           </span>
           <span className="type-mono ml-1 text-[0.6875rem] text-muted">bp</span>
@@ -109,7 +117,7 @@ export function RankBadge({ rank, balance }: { rank: RankInfo; balance: number }
         )}
       </div>
       <div className="mt-2 h-[4px] w-full rounded-full bg-line">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${rank.progress * 100}%` }} />
+        <div className="h-full rounded-full bg-gold" style={{ width: `${rank.progress * 100}%` }} />
       </div>
     </div>
   );
@@ -120,10 +128,13 @@ export function ResolveCard({
   result,
   balanceAfter,
   onCollect,
+  line,
 }: {
   result: ResolveResult;
   balanceAfter: number;
   onCollect: () => void;
+  /** Optional hard line — shown on failed verdicts only. */
+  line?: string;
 }) {
   const reduced = usePrefersReduced();
   const verdictTone =
@@ -161,7 +172,7 @@ export function ResolveCard({
         </div>
 
         <div className="mt-4 border-t border-line pt-4 text-center">
-          <span className="type-mono text-[2.25rem] leading-none text-accent">
+          <span className="type-mono text-[2.25rem] leading-none text-gold">
             +<CountUp to={result.total} duration={900} />
           </span>
           <span className="type-mono ml-1.5 text-[0.875rem] text-muted">bp</span>
@@ -169,6 +180,12 @@ export function ResolveCard({
             balance {balanceAfter} bp
           </div>
         </div>
+
+        {line && (
+          <p className="type-mono mt-4 border-t border-line pt-3 text-center text-[0.75rem] text-muted">
+            {line}
+          </p>
+        )}
 
         <Button className="mt-5 w-full" onClick={onCollect}>
           Collect

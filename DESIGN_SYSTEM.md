@@ -22,33 +22,37 @@ The user should feel: *"I am entering a system designed to improve me."* Never: 
 | `--focus` | mode accent | 2px offset focus ring |
 | grain | inline SVG `feTurbulence`, ~4% opacity | Atmosphere; kills the flat near-black AI look |
 
+*(Premium pass, 2026-07-09: both modes moved onto a near-black neutral base — the accent is a signal, not a wash — and the economy got its own shared metal.)*
+
 **Student mode** (`data-mode="student"`)
 
 | Token | Value | Contrast on bg | Role |
 |---|---|---|---|
-| `--bg` | `#0F1411` | — | Green-graphite ground |
-| `--surface` | `#161D18` | — | Cards |
-| `--surface-2` | `#1C241E` | — | Raised / hover |
-| `--line` | `#26332A` | — | Hairlines |
-| `--ink` | `#E6EDE4` | 15.6 | Primary text |
-| `--muted` | `#93A796` | 7.3 | Secondary text |
-| `--accent` | `#82BD8B` | 8.5 | Moss — actions, emphasis |
-| `--accent-ink` | `#0C130E` | 8.6 on accent | Text on accent fills |
+| `--bg` | `#0A0C0B` | — | Near-black, faint green temperature |
+| `--surface` / `--surface-2` | `#111514` / `#161B19` | — | Neutral cards + sheen |
+| `--line` | `#232A27` | — | Hairlines |
+| `--ink` | `#E9EDEA` | 16.6 | Primary text |
+| `--muted` | `#8FA098` | 7.2 | Secondary text |
+| `--accent` | `#45B683` | 7.7 | **Emerald** — record, observation |
+| `--accent-ink` | `#08120C` | 7.5 on accent | Text on accent fills |
+| `--gold` | `#D3AE64` | 9.4 | Money: bp, rank, momentum, seals |
 
 **Teacher mode** (`data-mode="teacher"`)
 
 | Token | Value | Contrast on bg | Role |
 |---|---|---|---|
-| `--bg` | `#150F10` | — | Oxblood-graphite ground |
-| `--surface` | `#1E1517` | — | Cards |
-| `--surface-2` | `#251A1C` | — | Raised / hover |
-| `--line` | `#382528` | — | Hairlines (higher presence than Student's) |
-| `--ink` | `#F0E7E3` | 15.6 | Primary text |
-| `--muted` | `#AC9088` | 6.4 | Secondary text |
-| `--accent` | `#E2734E` | 6.1 | Ember — verdicts, orders, emphasis |
-| `--accent-ink` | `#1C0E08` | 6.1 on accent | Text on accent fills |
+| `--bg` | `#0D0A0B` | — | Near-black, faint red temperature |
+| `--surface` / `--surface-2` | `#151112` / `#1B1516` | — | Neutral cards + sheen |
+| `--line` | `#2D2224` | — | Hairlines |
+| `--ink` | `#F0EAE8` | 16.6 | Primary text |
+| `--muted` | `#A38F8D` | 6.5 | Secondary text |
+| `--accent` | `#ED5656` | 5.7 | **Blood** — verdicts, orders, aggression |
+| `--accent-ink` | `#180808` | 5.6 on accent | Text on accent fills |
+| `--gold` | `#D3AE64` | 9.4 | Money (identical in both modes) |
 
-**Error semantics (audit §9.4):** Teacher ember (`#E2734E`) leans orange and is used for structure (rules, headers, fills); destructive red (`#FF4D42`) is pure signal red, appears only on outlined buttons with a named destructive verb. They never appear in the same component class.
+Seal metals (fixed, both modes, ≥4.5:1 on surfaces): silver `#9BA1A6` · bronze `#B08A50` · gold `#D3AE64` · obsidian `#C27A93`.
+
+**Error semantics (audit §9.4, revised):** the Teacher accent is now genuinely red by founder direction, so hue separation from destructive red is no longer sufficient alone. Mitigation: destructive actions never use solid red fills — they are outlined, carry a named destructive verb + confirm modal, and the prototype currently ships none. The mode test remains carried by density, radius, type weight and the mode banner, per §2.3.
 
 **Customisation architecture:** every visual decision routes through these tokens; both modes are complete token sets swapped by `data-mode` on `<html>`. Accent customisation (Settings) swaps `--accent`/`--accent-ink` pairs from a pre-validated list — each candidate pair ships with its contrast ratio computed against both grounds; pairs under 4.5:1 are not offered. Users can therefore re-skin safely without touching layout or ink tokens.
 
@@ -91,15 +95,16 @@ Animated: question advance (directional slide+fade), the Mode Shift, the mission
 
 `prefers-reduced-motion`: all Motion variants collapse to opacity-only or none; the Mode Shift becomes an instant swap with a static interstitial and a "Continue" button; count-ups render final values.
 
-## 3 · The Mode Shift (signature — boldness is spent here)
+## 3 · The Vault Seal (signature — boldness is spent here; upgraded in the premium pass)
 
-Timeline (total ≤1.2s, tap-to-skip at any point):
+Timeline (total ~1.65s, tap-to-skip at any point):
 
 | t | Event |
 |---|---|
-| 0–300ms | The Student record compresses slightly (scale 0.98) and receives a mono `SEALED` stamp — the seal is *felt* |
-| 200–900ms | Temperature inversion: `data-mode` flips; every token crossfades green-graphite → ember-graphite (CSS transition on token-driven properties) |
-| 450–1100ms | Interstitial line fades up: **"The record is sealed. Only what is written exists."** — then the Teacher heading rises, Fraunces hardening from SOFT 100 → 0 |
+| 0–900ms | **The vault**: door rings appear; the locking ring rotates 70° with a hard overshoot stop; six bolts extend staggered into the frame; a 1.045 scale punch lands the "clunk" |
+| ~600ms | Temperature inversion: `data-mode` flips mid-lock; tokens crossfade emerald-black → blood-black |
+| 850ms | `SEALED` stamp slams in (scale 1.5 → 1, −3° skew, overshoot ease) |
+| 1080–1650ms | The line rises: **"The record is sealed. Only what is written exists."** → auto-continue |
 
 Reverse shift (Teacher → done): everything falls away except the mission card. Line: *"One order on the desk."*
 
@@ -171,6 +176,12 @@ Gamification layer, **premium casino** register: tense, sharp, mono — a tradin
 **Color**: seal rarities use fixed hexes (independent of mode accent) so a rarity reads identically in both modes. Destructive red remains reserved; no economy element uses it.
 
 **Guardrails carried from the framework amendment**: pay for verifiable/anti-flattering/prediction-tested acts only; no negative balances; MVD pays a base; ranks unlock cosmetics only (accent presets are now earned — contrast guardrails still apply on top).
+
+**Gold rule (premium pass)**: every money element — bp numerals, balance, momentum links, bounty amounts, rank progress, resolve totals — renders in `--gold`, identical in both modes. Money is never a mode signal.
+
+**Hard lines (founder addition)**: aggressive one-liners from `src/lib/quotes.ts` (~55, deterministic daily pick per surface). Chrome only — login, dashboard sub-line, arm screen, failed-verdict resolve card, empty states — never inside questions, answers, or payout math. Mono type, quiet size, no exclamation marks added beyond the lines themselves. User-disableable (Settings → Hard lines). The framework's "no motivational content" rule is narrowed accordingly (see QUESTION_FRAMEWORK §11).
+
+**Unlimited prose (founder addition)**: `line`/`text` answers auto-grow with no character cap; the affordance under each field reads `no limit — say all of it`. Brevity survives as hint-level advice, not enforcement. Structured shapes (binary, enum, scale, count, list, mission) unchanged.
 
 ## 9 · Audit results (run against the built prototype, all screens screenshotted)
 

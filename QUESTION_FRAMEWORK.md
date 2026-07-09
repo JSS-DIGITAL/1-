@@ -478,6 +478,10 @@ All pass verbatim — no domain-specific rewording required.
 
 **Known residual risk** (accepted for prototype): self-report gaming cannot be fully prevented in a solo product; the calibration scoring and evidence audits are mitigation, not proof.
 
+**Further founder deviations (premium pass, same day):**
+- **Unlimited prose answers.** The `line`/`text` shapes no longer enforce character caps; boxes auto-grow and advertise "no limit". Brevity remains *advice* (hints unchanged) — the Brevity test now reads "answerable well in a few sentences", not "enforced by the box".
+- **Hard lines.** Must-Not-Exist §4 is narrowed: motivational content is banned *inside the loop* (questions, answers, payouts) but permitted in the chrome as terse, aggressive one-liners (login, dashboard, arm screen, failed verdicts, empty states), user-disableable. Rationale: the founder wants the product to punch; the loop's analytical integrity is preserved by keeping the lines out of the questions and the math.
+
 ## Definition-of-done check
 
 - Every kept question audited (Stage 2 dispositions + §8 tests applied; failures rewritten or cut) ✅

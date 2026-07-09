@@ -10,11 +10,12 @@ import { Shell } from "@/components/shell";
 import { Button, Card, Chip, CompoundRule, Label, StatTile } from "@/components/ui";
 import { DensityStrip, Sparkline } from "@/components/charts";
 import { BalanceTicker, BountyCard, MomentumMeter, RankBadge } from "@/components/economy-ui";
+import { hardLine } from "@/lib/quotes";
 import { useAnalytics, useApp, useAreaSeries, useEconomy, useYesterdayMission } from "@/lib/store";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { areas, todayDone, setPendingS1, missions } = useApp();
+  const { areas, todayDone, setPendingS1, missions, prefs } = useApp();
   const standing = useYesterdayMission();
   const analytics = useAnalytics();
   const econ = useEconomy();
@@ -37,6 +38,9 @@ export default function Dashboard() {
           <h1 className="type-display mt-1 text-[1.75rem] md:text-[2.25rem]">
             {today.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" })}
           </h1>
+          <p className="type-mono mt-1.5 text-[0.75rem] text-muted">
+            {prefs.hardLines ? hardLine("dash") : "You, versus your previous self."}
+          </p>
         </div>
         {todayDone && <Chip tone="accent">+0.01 filed</Chip>}
       </div>
@@ -84,6 +88,9 @@ export default function Dashboard() {
           <Card className="flex flex-col items-start justify-center gap-3">
             <Label>No standing mission</Label>
             <p className="type-display text-[1.375rem]">Run today&apos;s review to set one.</p>
+            {prefs.hardLines && (
+              <p className="type-mono text-[0.75rem] text-muted">{hardLine("empty")}</p>
+            )}
             <Button onClick={() => router.push("/review")}>Begin review</Button>
           </Card>
         ) : (
@@ -125,6 +132,12 @@ export default function Dashboard() {
         {areas.map((a) => (
           <AreaTile key={a.id} id={a.id} name={a.name} goal={a.goal} metric={a.metrics[0]} />
         ))}
+        <Link
+          href="/areas?new=1"
+          className="grid min-h-24 place-items-center rounded-[var(--radius)] border border-dashed border-line text-[0.875rem] text-muted transition-colors duration-[var(--dur-fast)] hover:border-muted hover:text-ink"
+        >
+          + New area
+        </Link>
       </div>
 
       <Card className="mt-[var(--gap)]">

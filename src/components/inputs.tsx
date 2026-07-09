@@ -10,6 +10,13 @@ import { Label } from "./ui";
 const fieldCls =
   "w-full rounded-[var(--radius-sm)] border border-line bg-surface-2 px-3 py-2.5 text-[0.9375rem] text-ink outline-none placeholder:text-muted/50 focus:border-accent";
 
+/* Prose fields auto-grow with no cap — the box itself says so. */
+const proseCls = `${fieldCls} min-h-[3rem] resize-none`;
+
+function NoLimit() {
+  return <p className="type-mono mt-1 text-[0.625rem] text-muted/70">no limit — say all of it</p>;
+}
+
 export function ShapeInput({
   shape,
   value,
@@ -96,13 +103,14 @@ function BinaryInput({
       {evidence && v && (
         <div className="rise">
           <Label className="mb-1.5">The evidence</Label>
-          <input
-            className={fieldCls}
+          <textarea
+            className={proseCls}
             value={v.evidence ?? ""}
             onChange={(e) => onChange({ ...v, evidence: e.target.value })}
             placeholder={v.value ? "What would an outside audit accept?" : "What was true instead?"}
-            maxLength={140}
+            rows={1}
           />
+          <NoLimit />
         </div>
       )}
     </div>
@@ -125,14 +133,15 @@ function EnumInput({
     <div className="space-y-4">
       {note && (
         <div>
-          <Label className="mb-1.5">The weakness — one line, from the record</Label>
-          <input
-            className={fieldCls}
+          <Label className="mb-1.5">The weakness — from the record</Label>
+          <textarea
+            className={proseCls}
             value={v?.note ?? ""}
             onChange={(e) => onChange({ kind: "enum", value: v?.value ?? "", note: e.target.value })}
             placeholder="Named precisely, not a theory about character"
-            maxLength={140}
+            rows={1}
           />
+          <NoLimit />
         </div>
       )}
       <div className={`grid gap-2 ${options.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
@@ -310,22 +319,25 @@ function LineInput({
   const v = value?.kind === "line" ? value : { kind: "line" as const, value: "", second: "" };
   return (
     <div className="space-y-3">
-      <input
-        className={fieldCls}
-        value={v.value}
-        onChange={(e) => onChange({ ...v, value: e.target.value })}
-        placeholder="One line. ≤140 characters."
-        maxLength={140}
-      />
+      <div>
+        <textarea
+          className={proseCls}
+          value={v.value}
+          onChange={(e) => onChange({ ...v, value: e.target.value })}
+          placeholder="Start with the truth. Keep going."
+          rows={1}
+        />
+        <NoLimit />
+      </div>
       {secondPrompt && (
         <div>
           <Label className="mb-1.5">{secondPrompt}</Label>
-          <input
-            className={fieldCls}
+          <textarea
+            className={proseCls}
             value={v.second ?? ""}
             onChange={(e) => onChange({ ...v, second: e.target.value })}
             placeholder="The replacement behaviour"
-            maxLength={140}
+            rows={1}
           />
         </div>
       )}
@@ -344,13 +356,13 @@ function TextInput({
   return (
     <div>
       <textarea
-        className={`${fieldCls} min-h-24 resize-y`}
+        className={`${proseCls} min-h-24`}
         value={v}
         onChange={(e) => onChange({ kind: "text", value: e.target.value })}
-        placeholder="Three sentences maximum. Facts only."
-        maxLength={320}
+        placeholder="Facts only. As long as it needs to be."
+        rows={3}
       />
-      <div className="type-mono mt-1 text-right text-[0.6875rem] text-muted">{v.length}/320</div>
+      <NoLimit />
     </div>
   );
 }

@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CountUp } from "@/components/charts";
+import { hardLine } from "@/lib/quotes";
 import { Button, Label, PercentGlyph } from "@/components/ui";
 
 const fieldCls =
@@ -33,6 +34,7 @@ export default function LoginPage() {
               A day is worth one percent. The year does the rest.
             </div>
           </div>
+          <p className="type-mono mt-6 text-[0.8125rem] text-ink/80">&ldquo;{hardLine("login")}&rdquo;</p>
         </div>
 
         <div className="rounded-[var(--radius)] border border-line bg-surface p-[var(--pad-card)]">

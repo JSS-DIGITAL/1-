@@ -38,14 +38,14 @@ interface AccentPair {
 
 export const ACCENT_PRESETS: Record<Mode, AccentPair[]> = {
   student: [
-    { name: "Moss", accent: "#82bd8b", accentInk: "#0c130e", rankReq: 0 },
-    { name: "Lichen", accent: "#9fbd7a", accentInk: "#11130a", rankReq: 2 },
-    { name: "Glacier", accent: "#7fbdb4", accentInk: "#0a1312", rankReq: 4 },
+    { name: "Emerald", accent: "#45b683", accentInk: "#08120c", rankReq: 0 },
+    { name: "Jade", accent: "#3fbf9f", accentInk: "#071311", rankReq: 2 },
+    { name: "Viridian", accent: "#7cc26b", accentInk: "#0c1207", rankReq: 4 },
   ],
   teacher: [
-    { name: "Ember", accent: "#e2734e", accentInk: "#1c0e08", rankReq: 0 },
-    { name: "Oxblood", accent: "#e06565", accentInk: "#1c0909", rankReq: 2 },
-    { name: "Brass", accent: "#d9a053", accentInk: "#170f06", rankReq: 3 },
+    { name: "Blood", accent: "#ed5656", accentInk: "#180808", rankReq: 0 },
+    { name: "Crimson", accent: "#e4485e", accentInk: "#160709", rankReq: 2 },
+    { name: "Garnet", accent: "#f07a5a", accentInk: "#170a06", rankReq: 3 },
   ],
 };
 
@@ -82,7 +82,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<Mode>("student");
   const [todayDone, setTodayDone] = useState(false);
   const [pendingS1, setPendingS1] = useState<boolean | null>(null);
-  const [prefs, setPrefsState] = useState<Prefs>({ rotation: true, deepTier: false, sound: false });
+  const [prefs, setPrefsState] = useState<Prefs>({
+    rotation: true,
+    deepTier: false,
+    sound: false,
+    hardLines: true,
+  });
   const [accents, setAccents] = useState<Record<Mode, AccentPair>>({
     student: ACCENT_PRESETS.student[0],
     teacher: ACCENT_PRESETS.teacher[0],

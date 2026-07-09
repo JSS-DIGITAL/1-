@@ -10,7 +10,7 @@ import { RANKS } from "@/lib/economy";
 import { ACCENT_PRESETS, useApp, useEconomy } from "@/lib/store";
 import type { Mode } from "@/lib/types";
 
-const MODE_BG: Record<Mode, string> = { student: "#0f1411", teacher: "#150f10" };
+const MODE_BG: Record<Mode, string> = { student: "#0a0c0b", teacher: "#0d0a0b" };
 
 function luminance(hex: string): number {
   const c = parseInt(hex.slice(1), 16);
@@ -125,6 +125,12 @@ export default function SettingsPage() {
               detail="Optional SD questions, user-pulled, max twice a week"
               value={prefs.deepTier}
               onChange={(v) => setPrefs({ deepTier: v })}
+            />
+            <PrefRow
+              label="Hard lines"
+              detail="Aggressive one-liners in the chrome. Never inside questions or payouts"
+              value={prefs.hardLines}
+              onChange={(v) => setPrefs({ hardLines: v })}
             />
             <PrefRow
               label="Mode-shift sound"

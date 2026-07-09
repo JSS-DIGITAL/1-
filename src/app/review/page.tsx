@@ -17,6 +17,8 @@ import { isAnswered, ShapeInput } from "@/components/inputs";
 import { ModeShift } from "@/components/mode-shift";
 import { ResolveCard } from "@/components/economy-ui";
 import { CountUp } from "@/components/charts";
+import { hardLine } from "@/lib/quotes";
+import Link from "next/link";
 import { Button, Card, Chip, CompoundRule, Label, ProgressSegments } from "@/components/ui";
 
 type Phase = "arm" | "student" | "shift" | "teacher" | "commit";
@@ -24,7 +26,8 @@ type Phase = "arm" | "student" | "shift" | "teacher" | "commit";
 export default function ReviewPage() {
   const router = useRouter();
   const reduced = usePrefersReduced();
-  const { areas, records, mode, setMode, pendingS1, setPendingS1, completeToday, todayDone } = useApp();
+  const { areas, records, mode, setMode, pendingS1, setPendingS1, completeToday, todayDone, prefs } =
+    useApp();
   const standing = useYesterdayMission();
 
   const [phase, setPhase] = useState<Phase>("arm");
@@ -129,6 +132,9 @@ export default function ReviewPage() {
         <div className="mx-auto max-w-md">
           <Label>Daily review</Label>
           <h1 className="type-display mt-2 text-[1.75rem]">Arm the loop.</h1>
+          {prefs.hardLines && (
+            <p className="type-mono mt-2 text-[0.75rem] text-muted">{hardLine("arm")}</p>
+          )}
           <Card className="mt-6 space-y-5">
             <div>
               <Label className="mb-2">Focus area</Label>
@@ -146,6 +152,12 @@ export default function ReviewPage() {
                     {a.name}
                   </button>
                 ))}
+                <Link
+                  href="/areas?new=1"
+                  className="rounded-[var(--radius-sm)] border border-dashed border-line px-4 py-2.5 text-center text-[0.8125rem] text-muted hover:border-muted hover:text-ink"
+                >
+                  + add another area
+                </Link>
               </div>
             </div>
             <div>
@@ -179,10 +191,10 @@ export default function ReviewPage() {
       )}
 
       {(phase === "student" || phase === "teacher") && effective && (
-        <div className="mx-auto max-w-xl">
+        <div className={`mx-auto ${phase === "teacher" ? "max-w-xl lg:max-w-5xl" : "max-w-xl"}`}>
           <div className="mb-6 flex items-center justify-between gap-4">
             <Label>
-              {phase} · {area.name}
+              {phase === "student" ? "student · record" : "teacher · judge"} · {area.name}
             </Label>
             <button onClick={() => router.push("/")} className="text-[0.75rem] text-muted underline hover:text-ink">
               exit — draft is kept
@@ -190,8 +202,20 @@ export default function ReviewPage() {
           </div>
           <ProgressSegments ids={steps} current={idx} />
 
-          {phase === "teacher" && <SealedRecord answers={answers} mvd={mvd} />}
+          <div
+            className={
+              phase === "teacher"
+                ? "lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-8"
+                : ""
+            }
+          >
+            {phase === "teacher" && (
+              <div className="lg:sticky lg:top-6">
+                <SealedRecord answers={answers} mvd={mvd} />
+              </div>
+            )}
 
+            <div>
           <AnimatePresence mode="wait" custom={dir}>
             <motion.div
               key={effective.id}
@@ -248,6 +272,8 @@ export default function ReviewPage() {
               the record is sealed — evaluation only
             </p>
           )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -258,6 +284,7 @@ export default function ReviewPage() {
           result={resolveResult}
           balanceAfter={econ.balance + resolveResult.total}
           onCollect={() => setResolveOpen(false)}
+          line={resolveResult.outcome === "failed" && prefs.hardLines ? hardLine("failed") : undefined}
         />
       )}
 
@@ -296,8 +323,13 @@ function SealedRecord({ answers, mvd }: { answers: Record<string, AnswerValue>; 
   return (
     <Card rule className="mt-6">
       <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between gap-3 text-left">
-        <Label>The record{mvd ? " · minimum day" : ""}</Label>
-        <span className="type-mono text-[0.6875rem] text-muted">{open ? "collapse" : "read"}</span>
+        <span className="flex items-center gap-2.5">
+          <Label>The record{mvd ? " · minimum day" : ""}</Label>
+          <span className="type-mono rotate-[-3deg] rounded-[2px] border border-accent px-1.5 py-0.5 text-[0.5625rem] uppercase tracking-[0.25em] text-accent">
+            sealed
+          </span>
+        </span>
+        <span className="type-mono text-[0.6875rem] text-muted lg:hidden">{open ? "collapse" : "read"}</span>
       </button>
       {open && (
         <div className="mt-3 space-y-2.5 border-t border-line pt-3">
