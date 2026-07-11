@@ -11,6 +11,7 @@ import { RankBadge } from "@/components/economy-ui";
 import { RANKS } from "@/lib/economy";
 import { ACCENT_PRESETS, useApp, useEconomy } from "@/lib/store";
 import { daysSinceBackup, markBackupNow } from "@/lib/persist";
+import { sendSupportMessage, type MessageKind } from "@/lib/support";
 import { RARITIES, VAULT_ACCENTS, VAULT_LOOT } from "@/lib/vault";
 import type { Mode } from "@/lib/types";
 
@@ -261,6 +262,8 @@ export default function SettingsPage() {
           <InstallApp />
         </Card>
 
+        <SupportCard defaultEmail={account?.email ?? ""} defaultName={account?.name ?? ""} />
+
         <Card>
           <Label className="mb-3">Data</Label>
           <p className="mb-3 text-[0.8125rem] text-muted">
@@ -363,5 +366,99 @@ function PrefRow({
         />
       </button>
     </div>
+  );
+}
+
+/** Support & feedback — straight into the founder's automations. "Help" gets
+ *  an instant emailed answer; bugs page the founder immediately. */
+function SupportCard({ defaultEmail, defaultName }: { defaultEmail: string; defaultName: string }) {
+  const [kind, setKind] = useState<MessageKind>("help");
+  const [email, setEmail] = useState(defaultEmail);
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const KINDS: { id: MessageKind; label: string }[] = [
+    { id: "help", label: "I need help" },
+    { id: "bug", label: "Something broke" },
+    { id: "idea", label: "An idea" },
+    { id: "love", label: "It's working" },
+  ];
+
+  const send = async () => {
+    const e = (email || defaultEmail).trim().toLowerCase();
+    if (!message.trim()) {
+      setStatus("Write the message first.");
+      return;
+    }
+    if (kind === "help" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      setStatus("Help replies arrive by email — enter a real one.");
+      return;
+    }
+    setSending(true);
+    const ok = await sendSupportMessage({ kind, email: e, name: defaultName || undefined, message: message.trim() });
+    setSending(false);
+    if (ok) {
+      setMessage("");
+      setStatus(
+        kind === "help"
+          ? "Sent — an answer is already on its way to your inbox (a human follows up if it missed)."
+          : kind === "bug"
+            ? "Filed — bugs page the founder immediately."
+            : "Logged — it lands on the founder's desk."
+      );
+    } else {
+      setStatus("Couldn't reach the desk — check your connection and try again.");
+    }
+  };
+
+  return (
+    <Card>
+      <Label className="mb-3">Support &amp; feedback</Label>
+      <div className="flex flex-wrap gap-2">
+        {KINDS.map((k) => (
+          <button
+            key={k.id}
+            onClick={() => setKind(k.id)}
+            className={`rounded-full border px-3 py-1 text-[0.75rem] transition-colors duration-[var(--dur-fast)] ${
+              kind === k.id ? "border-accent bg-accent/10 text-ink" : "border-line text-muted hover:border-muted"
+            }`}
+          >
+            {k.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 space-y-2">
+        <input
+          className="w-full max-w-sm rounded-[var(--radius-sm)] border border-line bg-surface-2 px-3 py-2.5 text-[0.9375rem] text-ink outline-none placeholder:text-muted/50 focus:border-accent"
+          type="email"
+          placeholder={kind === "help" ? "Your email — the answer arrives there" : "Email (optional)"}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <textarea
+          className="min-h-24 w-full resize-none rounded-[var(--radius-sm)] border border-line bg-surface-2 px-3 py-2.5 text-[0.9375rem] text-ink outline-none placeholder:text-muted/50 focus:border-accent"
+          placeholder={
+            kind === "bug"
+              ? "What broke, and what were you doing when it did?"
+              : kind === "help"
+                ? "What do you need? Straight answers, usually within minutes."
+                : "Say it plainly."
+          }
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={3}
+        />
+        <div className="flex items-center gap-3">
+          <Button onClick={send} disabled={sending || !message.trim()}>
+            {sending ? "Sending…" : "Send"}
+          </Button>
+          {status && <span className="type-mono text-[0.75rem] text-muted">{status}</span>}
+        </div>
+        <p className="type-mono text-[0.625rem] text-muted/70">
+          only this message and your email leave the device — never your record.
+        </p>
+      </div>
+    </Card>
   );
 }
