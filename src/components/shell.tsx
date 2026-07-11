@@ -19,7 +19,7 @@ export const MODE_BANNER = { student: "student · record", teacher: "teacher · 
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { mode } = useApp();
+  const { mode, isGuest } = useApp();
 
   return (
     <div className="atmosphere min-h-dvh">
@@ -67,7 +67,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="px-4 pb-24 pt-6 md:ml-[76px] md:px-10 md:pb-16">
-        <div className="mx-auto w-full max-w-5xl">{children}</div>
+        <div className="mx-auto w-full max-w-5xl">
+          {isGuest && (
+            <Link
+              href="/signup"
+              className="type-mono mb-4 block rounded-[var(--radius-sm)] border border-dashed px-4 py-2 text-center text-[0.6875rem] transition-colors hover:text-ink"
+              style={{ borderColor: "var(--gold)", color: "var(--gold)" }}
+            >
+              guest mode — nothing saves. create your account to keep the record →
+            </Link>
+          )}
+          {children}
+        </div>
       </main>
 
       {/* Mobile bottom nav */}

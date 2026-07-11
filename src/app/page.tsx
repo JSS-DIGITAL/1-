@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { CountUp } from "@/components/charts";
+import { InstallApp } from "@/components/install-app";
 import { Vault } from "@/components/mode-shift";
 import { Label, PercentGlyph } from "@/components/ui";
 import { HARD_LINES } from "@/lib/quotes";
@@ -262,7 +263,10 @@ export default function Landing() {
               <li className="flex gap-2.5"><span style={{ color: "var(--gold)" }}>—</span> A daily push at 21:00 that calls you out if the record is empty</li>
               <li className="flex gap-2.5"><span style={{ color: "var(--gold)" }}>—</span> The vault, the bets, the whole economy — offline-ready</li>
             </ul>
-            <div className="mt-7 flex flex-wrap items-center gap-3">
+            <div className="mt-7">
+              <InstallApp />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <span className="type-mono rounded-[var(--radius-sm)] border border-line px-5 py-3 text-[0.8125rem] text-muted">
                  App Store
               </span>
@@ -271,7 +275,7 @@ export default function Landing() {
               </span>
             </div>
             <p className="type-mono mt-3 text-[0.6875rem] text-muted/70">
-              coming to stores — the web app is live today
+              installable today from your browser — stores coming later
             </p>
             <Link
               href="/signup"

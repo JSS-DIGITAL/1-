@@ -104,6 +104,7 @@ export default function AreasPage() {
 
 function AreaCard({ area, count }: { area: Area; count: number }) {
   const [editing, setEditing] = useState(false);
+  const [editingArea, setEditingArea] = useState(false);
   const series = useAreaSeries(area.id, area.metrics[0]?.key ?? "");
   const targetSeries = useAreaSeries(area.id, area.target?.metricKey ?? area.metrics[0]?.key ?? "");
   const latest = targetSeries[targetSeries.length - 1];
@@ -161,16 +162,118 @@ function AreaCard({ area, count }: { area: Area; count: number }) {
         </div>
       </div>
 
-      <div className="mt-4 border-t border-line pt-3">
+      <div className="mt-4 flex gap-4 border-t border-line pt-3">
         <button
-          onClick={() => setEditing(!editing)}
+          onClick={() => {
+            setEditing(!editing);
+            setEditingArea(false);
+          }}
           className="type-mono text-[0.6875rem] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
         >
           {editing ? "close question editor" : "customize questions"}
         </button>
-        {editing && <QuestionEditor area={area} />}
+        <button
+          onClick={() => {
+            setEditingArea(!editingArea);
+            setEditing(false);
+          }}
+          className="type-mono text-[0.6875rem] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+        >
+          {editingArea ? "close area editor" : "edit area"}
+        </button>
       </div>
+      {editing && <QuestionEditor area={area} />}
+      {editingArea && <AreaEditor area={area} />}
     </Card>
+  );
+}
+
+/** Edit the campaign itself: name, goal, target, metric labels. Metric keys
+ *  stay immutable so history and trends keep lining up. */
+function AreaEditor({ area }: { area: Area }) {
+  const { updateArea } = useApp();
+  const [newMetric, setNewMetric] = useState("");
+
+  const setMetric = (key: string, patch: Partial<{ label: string; unit: string }>) =>
+    updateArea(area.id, {
+      metrics: area.metrics.map((m) => (m.key === key ? { ...m, ...patch } : m)),
+    });
+
+  const addMetric = () => {
+    const label = newMetric.trim();
+    if (!label || area.metrics.length >= 3) return;
+    const key = label.toLowerCase().replace(/\s+/g, "_");
+    if (area.metrics.some((m) => m.key === key)) return;
+    updateArea(area.id, { metrics: [...area.metrics, { key, label, unit: "" }] });
+    setNewMetric("");
+  };
+
+  return (
+    <div className="mt-3 space-y-3 rounded-[var(--radius-sm)] border border-line bg-surface-2/50 p-3">
+      <div>
+        <span className="type-mono text-[0.625rem] uppercase tracking-[0.15em] text-muted">Name</span>
+        <input className={`${editFieldCls} mt-1`} value={area.name} maxLength={40} onChange={(e) => updateArea(area.id, { name: e.target.value })} />
+      </div>
+      <div>
+        <span className="type-mono text-[0.625rem] uppercase tracking-[0.15em] text-muted">Goal</span>
+        <input className={`${editFieldCls} mt-1`} value={area.goal} maxLength={80} onChange={(e) => updateArea(area.id, { goal: e.target.value })} />
+      </div>
+      <div>
+        <span className="type-mono text-[0.625rem] uppercase tracking-[0.15em] text-muted">Metrics · labels editable, history stays aligned</span>
+        <div className="mt-1 space-y-2">
+          {area.metrics.map((m) => (
+            <div key={m.key} className="flex gap-2">
+              <input className={editFieldCls} value={m.label} maxLength={30} onChange={(e) => setMetric(m.key, { label: e.target.value })} />
+              <input className={`${editFieldCls} w-20 shrink-0`} value={m.unit} maxLength={8} placeholder="unit" onChange={(e) => setMetric(m.key, { unit: e.target.value })} />
+            </div>
+          ))}
+          {area.metrics.length < 3 && (
+            <div className="flex gap-2">
+              <input className={editFieldCls} value={newMetric} maxLength={30} placeholder="add a metric (e.g. calls made)" onChange={(e) => setNewMetric(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addMetric()} />
+              <Button variant="ghost" onClick={addMetric} disabled={!newMetric.trim()}>
+                Add
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+      <div>
+        <span className="type-mono text-[0.625rem] uppercase tracking-[0.15em] text-muted">Target · gold bar on the card</span>
+        <div className="mt-1 grid grid-cols-[1fr_90px_1fr] gap-2">
+          <select
+            className={editFieldCls}
+            value={area.target?.metricKey ?? ""}
+            onChange={(e) =>
+              e.target.value
+                ? updateArea(area.id, { target: { metricKey: e.target.value, value: area.target?.value ?? 10, by: area.target?.by ?? "end of month" } })
+                : updateArea(area.id, { target: undefined })
+            }
+          >
+            <option value="">no target</option>
+            {area.metrics.map((m) => (
+              <option key={m.key} value={m.key}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            className={editFieldCls}
+            value={area.target?.value ?? ""}
+            disabled={!area.target}
+            onChange={(e) => area.target && updateArea(area.id, { target: { ...area.target, value: Number(e.target.value) || 0 } })}
+          />
+          <input
+            className={editFieldCls}
+            value={area.target?.by ?? ""}
+            disabled={!area.target}
+            placeholder="by when"
+            maxLength={30}
+            onChange={(e) => area.target && updateArea(area.id, { target: { ...area.target, by: e.target.value } })}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 

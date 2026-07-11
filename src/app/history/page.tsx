@@ -8,7 +8,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Shell } from "@/components/shell";
 import { Card, Chip, Label } from "@/components/ui";
 import { SealStamp, SEAL_COLORS, SEAL_NAMES } from "@/components/economy-ui";
-import { SEAL_ORDER } from "@/lib/economy";
+import { isNoneText, SEAL_ORDER } from "@/lib/economy";
+import { SECTIONS } from "@/lib/framework";
 import { useApp } from "@/lib/store";
 import { dayOffset, iso } from "@/lib/mock";
 import type { AnswerValue, DayRecord, Mission } from "@/lib/types";
@@ -263,10 +264,29 @@ export default function HistoryPage() {
                   )}
                 </Row>
               )}
+              {record.answers.S1?.kind === "binary" && (
+                <Row label="Mission claim">
+                  {record.answers.S1.value ? "Done" : "Not done"}
+                  {record.answers.S1.evidence ? ` — ${record.answers.S1.evidence}` : ""}
+                </Row>
+              )}
               <AnswerRow label="Completed" v={record.answers.S2} />
               <NumbersRow v={record.answers.S3} />
               <AnswerRow label="Avoided" v={record.answers.S4} />
               <AnswerRow label="Conditions" v={record.answers.S5} />
+              {/* Framework v2: the section prose, labeled by section name. */}
+              {SECTIONS.filter((s) => record.answers[s.proseId]?.kind === "text").map((s) => {
+                const p = record.answers[s.proseId];
+                if (p?.kind !== "text" || !p.value.trim()) return null;
+                return (
+                  <Row key={s.proseId} label={s.name}>
+                    {p.value}
+                    {isNoneText(p.value) && (
+                      <span className="type-mono ml-2 text-[0.625rem] text-muted/60">· none — tracked</span>
+                    )}
+                  </Row>
+                );
+              })}
               <AnswerRow label="Motion without progress" v={record.answers.T2} />
               {record.weakness && (
                 <Row label="Weakness">
@@ -276,7 +296,29 @@ export default function HistoryPage() {
                   </Chip>
                 </Row>
               )}
+              {record.answers.TR?.kind === "scale" && (
+                <Row label="Execution Rating">
+                  <span className="type-mono" style={{ color: "var(--gold)" }}>
+                    {record.answers.TR.value}/10
+                  </span>
+                  {record.answers.TR.why ? ` — ${record.answers.TR.why}` : ""}
+                </Row>
+              )}
+              {["C1", "C2", "C3"].map((cid) => {
+                const v = record.answers[cid];
+                if (!v || (v.kind !== "line" && v.kind !== "text") || !v.value.trim()) return null;
+                return (
+                  <Row key={cid} label={`Your question (${cid})`}>
+                    {v.value}
+                  </Row>
+                );
+              })}
               <AnswerRow label="Committed that evening" v={record.answers.T4} />
+              {(record.noneCount ?? 0) > 0 && (
+                <Row label="Explicit nones">
+                  <span className="type-mono text-[0.8125rem]">{record.noneCount} — legal, and on the books</span>
+                </Row>
+              )}
             </div>
           </Card>
         ) : (

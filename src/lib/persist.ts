@@ -51,3 +51,58 @@ export function clearState(): void {
   saveTimer = null;
   window.localStorage.removeItem(PERSIST_KEY);
 }
+
+// ---- The in-progress review draft ("exit — draft is kept", now true) ----
+
+const DRAFT_KEY = "one-percent-draft";
+
+export interface ReviewDraft {
+  date: string;
+  areaId: string;
+  mvd: boolean;
+  phase: "student" | "teacher";
+  idx: number;
+  answers: Record<string, unknown>;
+}
+
+export function loadDraft(): ReviewDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as ReviewDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDraft(d: ReviewDraft): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  } catch {
+    /* storage full — the session continues in memory */
+  }
+}
+
+export function clearDraft(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(DRAFT_KEY);
+}
+
+// ---- Backup age (the eviction-risk nudge) ----
+
+const BACKUP_AT_KEY = "one-percent-last-backup";
+
+export function markBackupNow(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(BACKUP_AT_KEY, String(Date.now()));
+}
+
+export function daysSinceBackup(): number | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(BACKUP_AT_KEY);
+  if (!raw) return null;
+  const t = Number(raw);
+  if (!Number.isFinite(t)) return null;
+  return Math.floor((Date.now() - t) / 86400000);
+}

@@ -17,6 +17,23 @@ export default function AnalyticsPage() {
   const fullDays = a.density.filter((d) => d.kind === "full").length;
   const mvdDays = a.density.filter((d) => d.kind === "mvd").length;
 
+  // Execution Rating (TR) trend — the founder's evidence-anchored self-verdict.
+  const trSeries = records
+    .filter((r) => r.answers.TR?.kind === "scale")
+    .map((r) => (r.answers.TR as { kind: "scale"; value: number }).value);
+
+  // Cause-picker breakdown (SP5c obstacle causes + TP2c gap causes).
+  const causeCounts = new Map<string, number>();
+  for (const r of records) {
+    for (const id of ["SP5c", "TP2c"]) {
+      const v = r.answers[id];
+      if (v?.kind === "enum" && v.value) causeCounts.set(v.value, (causeCounts.get(v.value) ?? 0) + 1);
+    }
+  }
+  const causeItems = [...causeCounts.entries()]
+    .map(([text, count]) => ({ text, count }))
+    .sort((x, y) => y.count - x.count);
+
   return (
     <Shell>
       <Label>Analytics</Label>
@@ -91,6 +108,38 @@ export default function AnalyticsPage() {
               <p className="text-[0.8125rem] text-muted">No chronic weaknesses on the board.</p>
             )}
           </div>
+        </Card>
+
+        <Card>
+          <Label className="mb-1">Your own verdict, over time</Label>
+          <p className="mb-4 text-[0.8125rem] text-muted">
+            The Execution Rating (0–10 against your own standard). The trend matters more than any single
+            night&apos;s number.
+          </p>
+          {trSeries.length >= 2 ? (
+            <div className="flex items-end gap-4">
+              <Sparkline data={trSeries.slice(-30)} width={220} height={44} />
+              <span className="type-mono text-[1.5rem]" style={{ color: "var(--gold)" }}>
+                {trSeries[trSeries.length - 1]}
+                <span className="text-[0.75rem] text-muted">/10 latest</span>
+              </span>
+            </div>
+          ) : (
+            <p className="text-[0.8125rem] text-muted">Two rated nights and the trend line starts.</p>
+          )}
+        </Card>
+
+        <Card>
+          <Label className="mb-1">Where the gaps come from</Label>
+          <p className="mb-4 text-[0.8125rem] text-muted">
+            Your own cause calls — obstacles (Student) and gaps (Teacher). Patterns here name the system
+            change before you feel it.
+          </p>
+          {causeItems.length > 0 ? (
+            <RecurrenceBars items={causeItems} />
+          ) : (
+            <p className="text-[0.8125rem] text-muted">Tap a cause chip during a review and the ledger opens.</p>
+          )}
         </Card>
 
         <Card>

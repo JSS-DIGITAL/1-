@@ -5,6 +5,7 @@
 // widget in the app: answering it starts the review with S1 pre-armed.
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Button, Card, Chip, CompoundRule, Label, StatTile } from "@/components/ui";
@@ -19,6 +20,7 @@ import {
   ShieldCard,
 } from "@/components/economy-ui";
 import { candorForQuestion } from "@/lib/economy";
+import { daysSinceBackup } from "@/lib/persist";
 import { dayOffset } from "@/lib/mock";
 import { useAnalytics, useApp, useAreaSeries, useEconomy, useHardLine, useYesterdayMission } from "@/lib/store";
 
@@ -63,6 +65,9 @@ export default function TodayPage() {
         </div>
         {todayDone && <Chip tone="accent">+0.01 filed</Chip>}
       </div>
+
+      <FirstRunPrimer />
+      <BackupNudge />
 
       {/* The economy strip: balance, rank, momentum, grip, shield, PRs. */}
       <Card className="mt-6 grid gap-6 md:grid-cols-3">
@@ -289,6 +294,67 @@ function AreaTile({
           <Sparkline data={series.slice(-20)} width={200} height={30} />
         </div>
       </Card>
+    </Link>
+  );
+}
+
+/** One-time primer for a brand-new record — three steps, then it's gone. */
+function FirstRunPrimer() {
+  const { records } = useApp();
+  const router = useRouter();
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    setShow(records.length === 0 && window.localStorage.getItem("one-percent-primer-done") !== "1");
+  }, [records.length]);
+  if (!show) return null;
+  const dismiss = () => {
+    window.localStorage.setItem("one-percent-primer-done", "1");
+    setShow(false);
+  };
+  return (
+    <Card rule className="mt-6">
+      <div className="flex items-start justify-between gap-3">
+        <Label>How 1% works — 30 seconds</Label>
+        <button onClick={dismiss} className="type-mono text-[0.6875rem] text-muted underline hover:text-ink">
+          got it — don&apos;t show again
+        </button>
+      </div>
+      <ol className="mt-3 grid gap-3 md:grid-cols-3">
+        <li className="text-[0.875rem] leading-relaxed text-muted">
+          <span className="type-mono text-accent">01 · record.</span> Tonight, the Student writes what
+          actually happened — facts, numbers, what you dodged. No limits, no judgement.
+        </li>
+        <li className="text-[0.875rem] leading-relaxed text-muted">
+          <span className="type-mono text-accent">02 · seal.</span> The record locks into the vault —
+          permanent. Only what is written exists.
+        </li>
+        <li className="text-[0.875rem] leading-relaxed text-muted">
+          <span className="type-mono text-accent">03 · judge.</span> The Teacher reads it like a coach:
+          one weakness, one mission for tomorrow, one stake on your word.
+        </li>
+      </ol>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button onClick={() => router.push("/review")}>Start tonight&apos;s review</Button>
+        <span className="type-mono text-[0.6875rem] text-muted">~3 minutes on the minimum day</span>
+      </div>
+    </Card>
+  );
+}
+
+/** Storage-eviction insurance: nudge when the backup is stale. */
+function BackupNudge() {
+  const { records } = useApp();
+  const [days, setDays] = useState<number | null | undefined>(undefined);
+  useEffect(() => {
+    setDays(daysSinceBackup());
+  }, []);
+  if (records.length < 3 || days === undefined || (days !== null && days < 14)) return null;
+  return (
+    <Link
+      href="/settings"
+      className="type-mono mt-4 block rounded-[var(--radius-sm)] border border-dashed border-line px-4 py-2 text-center text-[0.6875rem] text-muted hover:text-ink"
+    >
+      {days === null ? "no backup taken yet" : `last backup ${days} days ago`} — export one in Settings →
     </Link>
   );
 }

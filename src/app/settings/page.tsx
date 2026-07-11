@@ -6,9 +6,11 @@
 import { useRef, useState } from "react";
 import { Shell } from "@/components/shell";
 import { Button, Card, Label } from "@/components/ui";
+import { InstallApp } from "@/components/install-app";
 import { RankBadge } from "@/components/economy-ui";
 import { RANKS } from "@/lib/economy";
 import { ACCENT_PRESETS, useApp, useEconomy } from "@/lib/store";
+import { daysSinceBackup, markBackupNow } from "@/lib/persist";
 import { RARITIES, VAULT_ACCENTS, VAULT_LOOT } from "@/lib/vault";
 import type { Mode } from "@/lib/types";
 
@@ -30,14 +32,14 @@ function contrast(a: string, b: string): number {
 }
 
 export default function SettingsPage() {
-  const { mode, setMode, accents, setAccent, prefs, setPrefs, records, missions, areas, ledger, vault, loadDemo, wipeAll, importData } = useApp();
+  const { mode, setMode, accents, setAccent, prefs, setPrefs, vault, loadDemo, wipeAll, importData, exportSnapshot, account, records } = useApp();
   const econ = useEconomy();
   const [dataMsg, setDataMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const exportData = () => {
-    // The full device state — this file IS the backup.
-    const blob = new Blob([JSON.stringify({ areas, records, missions, ledger, prefs, vault }, null, 2)], {
+    // The full device state — this file IS the backup, nothing missing.
+    const blob = new Blob([JSON.stringify(exportSnapshot(), null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -46,6 +48,8 @@ export default function SettingsPage() {
     a.download = "one-percent-backup.json";
     a.click();
     URL.revokeObjectURL(url);
+    markBackupNow();
+    setDataMsg("backup exported — keep it somewhere safe.");
   };
 
   const onImportFile = async (file: File | undefined) => {
@@ -250,12 +254,35 @@ export default function SettingsPage() {
         </Card>
 
         <Card>
+          <Label className="mb-3">Install</Label>
+          <p className="mb-3 text-[0.8125rem] text-muted">
+            1% installs like a real app — full screen, its own icon, works offline.
+          </p>
+          <InstallApp />
+        </Card>
+
+        <Card>
           <Label className="mb-3">Data</Label>
           <p className="mb-3 text-[0.8125rem] text-muted">
-            The record belongs to you — it lives on this device only, no account, no cloud. The export is
-            your backup: take one before long absences (phone browsers can evict storage after weeks of
-            disuse) or before switching devices.
+            The record belongs to you — it lives on this device only. The export is your backup: take one
+            before long absences (phone browsers can evict storage after weeks of disuse) or before
+            switching devices.
+            {account && (
+              <span className="type-mono mt-1 block text-[0.6875rem] text-muted/80">
+                registered: {account.email} · sync is coming — until then the backup file moves devices
+              </span>
+            )}
           </p>
+          {records.length > 0 &&
+            (() => {
+              const d = daysSinceBackup();
+              if (d !== null && d < 14) return null;
+              return (
+                <p className="type-mono mb-3 text-[0.75rem]" style={{ color: "var(--gold)" }}>
+                  ⚠ {d === null ? "no backup taken yet" : `last backup ${d} days ago`} — your record deserves one.
+                </p>
+              );
+            })()}
           <div className="flex flex-wrap gap-2">
             <Button variant="ghost" onClick={exportData}>
               Export backup

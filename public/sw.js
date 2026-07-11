@@ -2,7 +2,7 @@
 // app when online, cached shell when not), cache-first for hashed static
 // assets and icons. Bump CACHE to invalidate after breaking changes.
 
-const CACHE = "one-percent-sw-v1";
+const CACHE = "one-percent-sw-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -23,8 +23,8 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
 
-  // Hashed build assets + icons: cache-first.
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest") {
+  // Hashed build assets: cache-first (immutable by name).
+  if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       caches.open(CACHE).then(async (cache) => {
         const hit = await cache.match(req);
@@ -32,6 +32,23 @@ self.addEventListener("fetch", (event) => {
         const res = await fetch(req);
         if (res.ok) cache.put(req, res.clone());
         return res;
+      })
+    );
+    return;
+  }
+
+  // Brand surfaces (manifest, icons, og): network-first so updates land on
+  // the next load, cache fallback for offline.
+  if (url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest" || url.pathname === "/og.png") {
+    event.respondWith(
+      caches.open(CACHE).then(async (cache) => {
+        try {
+          const res = await fetch(req);
+          if (res.ok) cache.put(req, res.clone());
+          return res;
+        } catch {
+          return (await cache.match(req)) ?? Response.error();
+        }
       })
     );
     return;

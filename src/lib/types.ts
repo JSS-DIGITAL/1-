@@ -148,6 +148,15 @@ export interface LedgerEntry {
   note: string;
 }
 
+// ---- Account (community registration; device-local until sync ships) ----
+
+export interface Account {
+  email: string;
+  name?: string;
+  /** ISO date of registration on this device. */
+  since: string;
+}
+
 // ---- The Vault Game (QUESTION_FRAMEWORK.md §12.10) ----
 
 /** Tonight's combination: three digits earned by the day's honest acts. */

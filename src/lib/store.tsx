@@ -8,7 +8,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { generateMock, dayOffset } from "./mock";
-import { clearState, loadState, saveStateDebounced } from "./persist";
+import { clearState, loadState, PERSIST_KEY, saveStateDebounced } from "./persist";
+import { retryQueuedSignups } from "./signup";
 import {
   achievementsFrom,
   balanceOf,
@@ -31,6 +32,7 @@ import { SEED_FUEL } from "./motivation";
 import { candorForQuestion } from "./economy";
 import { HARD_LINES } from "./quotes";
 import type {
+  Account,
   Area,
   AnswerValue,
   DayRecord,
@@ -68,6 +70,13 @@ export interface Persisted {
   shieldHeld: boolean;
   pinnedLine: string | null;
   weeklyDoneWeek: string | null;
+  account: Account | null;
+}
+
+/** Guest sessions ("try free") never write to the device. Tab-scoped. */
+export const GUEST_FLAG = "one-percent-guest";
+export function isGuestSession(): boolean {
+  return typeof window !== "undefined" && window.sessionStorage.getItem(GUEST_FLAG) === "1";
 }
 
 /** Day one, for real: one clean area, nothing invented. */
@@ -155,6 +164,11 @@ interface AppState {
   loadDemo: () => void;
   wipeAll: () => void;
   importData: (data: unknown) => boolean;
+  exportSnapshot: () => Persisted;
+  /** Community registration + guest mode ("try free" saves nothing). */
+  account: Account | null;
+  isGuest: boolean;
+  setAccount: (a: Account | null) => void;
   completeToday: (opts: {
     areaId: string;
     kind: "full" | "mvd";
@@ -192,62 +206,123 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const weeklyDone = weeklyDoneWeek === weekKeyOf(dayOffset(0));
   const [pinnedLine, setPinnedLine] = useState<string | null>(null);
   const [vault, setVault] = useState<VaultState>(() => makeEmptyVault());
+  const [account, setAccountState] = useState<Account | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
 
-  // ---- Hydrate from the device, once, before paint ----
+  const applySaved = useCallback((saved: Persisted) => {
+    const today = dayOffset(0);
+    setAreas(saved.areas?.length ? saved.areas : [makeEmptyArea()]);
+    setRecords(saved.records ?? []);
+    setMissions(saved.missions ?? []);
+    setLedger(saved.ledger ?? []);
+    setFuel(saved.fuel?.length ? saved.fuel : SEED_FUEL);
+    setSavedFuelIds(saved.savedFuelIds ?? []);
+    setFocusLogs(saved.focusLogs ?? []);
+    if (saved.prefs) setPrefsState((p) => ({ ...p, ...saved.prefs }));
+    if (saved.accents) setAccents(saved.accents);
+    setShieldHeld(Boolean(saved.shieldHeld));
+    setPinnedLine(saved.pinnedLine ?? null);
+    setWeeklyDoneWeek(saved.weeklyDoneWeek ?? null);
+    setAccountState(saved.account ?? null);
+    const v = saved.vault ?? makeEmptyVault();
+    // Yesterday's honesty doesn't open tonight's vault: stale digits reset.
+    setVault(
+      v.digitsDate === today
+        ? v
+        : { ...v, digits: { seal: false, candor: false, calibration: false }, digitValues: [0, 0, 0], digitsDate: undefined }
+    );
+    setTodayDone((saved.records ?? []).some((r) => r.date === today));
+  }, []);
+
+  // ---- Hydrate from the device, once, before paint. Guests get a blank
+  // in-memory world and never touch what's stored on this device. ----
   useIsoLayoutEffect(() => {
-    const saved = loadState<Persisted>();
-    if (saved) {
-      const today = dayOffset(0);
-      setAreas(saved.areas?.length ? saved.areas : [makeEmptyArea()]);
-      setRecords(saved.records ?? []);
-      setMissions(saved.missions ?? []);
-      setLedger(saved.ledger ?? []);
-      setFuel(saved.fuel?.length ? saved.fuel : SEED_FUEL);
-      setSavedFuelIds(saved.savedFuelIds ?? []);
-      setFocusLogs(saved.focusLogs ?? []);
-      if (saved.prefs) setPrefsState((p) => ({ ...p, ...saved.prefs }));
-      if (saved.accents) setAccents(saved.accents);
-      setShieldHeld(Boolean(saved.shieldHeld));
-      setPinnedLine(saved.pinnedLine ?? null);
-      setWeeklyDoneWeek(saved.weeklyDoneWeek ?? null);
-      const v = saved.vault ?? makeEmptyVault();
-      // Yesterday's honesty doesn't open tonight's vault: stale digits reset.
-      setVault(
-        v.digitsDate === today
-          ? v
-          : { ...v, digits: { seal: false, candor: false, calibration: false }, digitValues: [0, 0, 0], digitsDate: undefined }
-      );
-      setTodayDone((saved.records ?? []).some((r) => r.date === today));
+    if (isGuestSession()) {
+      setIsGuest(true);
+    } else {
+      const saved = loadState<Persisted>();
+      if (saved) applySaved(saved);
     }
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Registrations that failed offline get another shot each load.
+  useEffect(() => {
+    if (hydrated && !isGuest) void retryQueuedSignups();
+  }, [hydrated, isGuest]);
+
+  // ---- Other tabs win: adopt their writes instead of clobbering them ----
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== PERSIST_KEY || !e.newValue || isGuestSession()) return;
+      const saved = loadState<Persisted>();
+      if (saved) applySaved(saved);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [applySaved]);
+
+  // ---- Midnight rollover: an open app crosses the date line correctly ----
+  const [currentDay, setCurrentDay] = useState(() => dayOffset(0));
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const d = dayOffset(0);
+      setCurrentDay((prev) => (prev === d ? prev : d));
+    }, 60_000);
+    return () => clearInterval(iv);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    setTodayDone(records.some((r) => r.date === currentDay));
+    setVault((v) =>
+      !v.digitsDate || v.digitsDate === currentDay
+        ? v
+        : { ...v, digits: { seal: false, candor: false, calibration: false }, digitValues: [0, 0, 0], digitsDate: undefined }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDay, hydrated]);
   const [accents, setAccents] = useState<Record<Mode, AccentPair>>({
     student: ACCENT_PRESETS.student[0],
     teacher: ACCENT_PRESETS.teacher[0],
   });
   const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ---- Write-through: every change lands on the device (debounced) ----
+  // ---- Write-through: every change lands on the device (debounced).
+  // Guests never write — "try free" saves nothing, by design. ----
+  const snapshot: Persisted = {
+    areas,
+    records,
+    missions,
+    ledger,
+    fuel,
+    savedFuelIds,
+    focusLogs,
+    prefs,
+    accents,
+    vault,
+    shieldHeld,
+    pinnedLine,
+    weeklyDoneWeek,
+    account,
+  };
   useEffect(() => {
-    if (!hydrated) return;
-    const snapshot: Persisted = {
-      areas,
-      records,
-      missions,
-      ledger,
-      fuel,
-      savedFuelIds,
-      focusLogs,
-      prefs,
-      accents,
-      vault,
-      shieldHeld,
-      pinnedLine,
-      weeklyDoneWeek,
-    };
+    if (!hydrated || isGuest) return;
     saveStateDebounced(snapshot);
-  }, [hydrated, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, isGuest, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek, account]);
+
+  /** The full snapshot — Settings export uses this so backups miss nothing. */
+  const exportSnapshot = useCallback((): Persisted => snapshot, [snapshot]);
+
+  /** Registration lands here: account saved, persistence stays/becomes on. */
+  const setAccount = useCallback((a: Account | null) => {
+    setAccountState(a);
+    if (a && typeof window !== "undefined") {
+      window.sessionStorage.removeItem(GUEST_FLAG);
+      setIsGuest(false);
+    }
+  }, []);
 
   // ---- Data controls (Settings): demo world, clean slate, backup import ----
 
@@ -278,6 +353,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const wipeAll = useCallback(() => {
     clearState();
+    setAccountState(null);
     setAreas([makeEmptyArea()]);
     setRecords([]);
     setMissions([]);
@@ -631,6 +707,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     loadDemo,
     wipeAll,
     importData,
+    exportSnapshot,
+    account,
+    isGuest,
+    setAccount,
     completeToday,
   };
 

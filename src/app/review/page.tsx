@@ -6,7 +6,7 @@
 // flow. Student → Seal → Mode Shift → Teacher → one order on the desk.
 // Consumes QUESTION_FRAMEWORK.md §12 via src/lib/framework.ts.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePrefersReduced } from "@/lib/use-reduced";
@@ -22,6 +22,7 @@ import {
 import type { Area, AnswerValue, MissionOutcome, Question, ResolveResult, Section } from "@/lib/types";
 import { useApp, useEconomy, useHardLine, useYesterdayMission } from "@/lib/store";
 import { candorForQuestion, chainFrom, drawSeal, isNoneText, momentumFromChain, resolveWager } from "@/lib/economy";
+import { clearDraft, loadDraft, saveDraft } from "@/lib/persist";
 import { dayOffset } from "@/lib/mock";
 import { isAnswered, ShapeInput } from "@/components/inputs";
 import { ModeShift } from "@/components/mode-shift";
@@ -100,9 +101,38 @@ export default function ReviewPage() {
   const [showRankUp, setShowRankUp] = useState(false);
   const [shieldBurn, setShieldBurn] = useState(false);
   const econ = useEconomy();
-  const { missions, shieldHeld, focusLogs } = useApp();
+  const { missions, shieldHeld, focusLogs, isGuest } = useApp();
   const armLine = useHardLine("arm");
   const failLine = useHardLine("failed");
+
+  // "exit — draft is kept" is now true: the in-progress review autosaves and
+  // restores on return (same day only; guests save nothing by design).
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || todayDone) return;
+    restored.current = true;
+    const d = loadDraft();
+    if (!d) return;
+    if (d.date !== dayOffset(0)) {
+      clearDraft();
+      return;
+    }
+    if (Object.keys(d.answers).length === 0) return;
+    setAnswers(d.answers as Record<string, AnswerValue>);
+    setAreaId(d.areaId);
+    setMvd(d.mvd);
+    setIdx(d.idx);
+    setPhase(d.phase);
+    if (d.phase === "teacher") setMode("teacher", false);
+    else if (mode !== "student") setMode("student", false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayDone]);
+
+  useEffect(() => {
+    if (isGuest) return;
+    if (phase !== "student" && phase !== "teacher") return;
+    saveDraft({ date: dayOffset(0), areaId, mvd, phase, idx, answers });
+  }, [answers, areaId, mvd, phase, idx, isGuest]);
 
   const hasMission = Boolean(standing);
   const s1 = answers.S1;
@@ -233,6 +263,7 @@ export default function ReviewPage() {
       setPhase("shift");
     } else {
       completeToday({ areaId, kind: mvd ? "mvd" : "full", answers, burnShield: shieldBurn });
+      clearDraft();
       setPhase("commit");
     }
   };
@@ -244,7 +275,14 @@ export default function ReviewPage() {
     setIdx(idx - 1);
   };
 
-  const setAnswer = (id: string, v: AnswerValue) => setAnswers((a) => ({ ...a, [id]: v }));
+  const setAnswer = (id: string, v: AnswerValue) =>
+    setAnswers((a) => {
+      const next = { ...a, [id]: v };
+      // The miss-timeline only exists for a missed mission: flipping S1 back
+      // to yes prunes ST1 so a stale answer can't seal into the record.
+      if (id === "S1" && v.kind === "binary" && v.value === true) delete next.ST1;
+      return next;
+    });
   const clearAnswer = (id: string) =>
     setAnswers((a) => {
       const nextA = { ...a };

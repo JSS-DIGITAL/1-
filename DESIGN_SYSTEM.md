@@ -340,6 +340,35 @@ wheel** (framer pan → MotionValue rotation).
   `vercel deploy --prod`. Live: **https://one-percent-eta.vercel.app**. GitHub remote pending (needs a
   one-time repo creation + GCM push); until then, redeploys are one CLI command.
 
+## 8j · Audit round (added 2026-07-11 — 19 fixes + community signup, additive-only per founder rule)
+
+**Bugs closed:** the review draft now genuinely survives exit (autosaved per-day to
+`one-percent-draft`, restored on return, cleared on seal); flipping S1 back to yes prunes a stale ST1;
+the vault skill game cleanly denies instead of hanging when an open is guarded out; a 60s day-rollover
+effect re-derives todayDone/vault digits across midnight; the Settings export is now the FULL persisted
+snapshot (via `exportSnapshot`); a `storage`-event listener adopts other tabs' writes.
+
+**The three doors (signup/login):** "Create account" = name-optional + email → the founder's n8n lead
+pipeline (NEW workflow `1% — Signups` qupYbfuV4HZif4zE, webhook `/webhook/one-percent-signup` →
+GHL upsert, tag `one-percent-signup`; existing workflows untouched; failed posts queue on-device and
+retry) → local `account`, persistence on. "Try it free — nothing saves" = tab-scoped guest session
+(sessionStorage flag, hydrate skipped, write-through disabled, gold dashed banner in the shell).
+"Log in" = email marks the device; backup import remains the device-move path. The password field stays
+(no-remove rule) but is disabled with honest copy — no password is collected or sent until real auth.
+
+**Live-readiness:** route/global error boundaries + 404 in system voice ("Something broke. The record
+didn't."); OG/twitter meta + generated `og.png` (1200×630); `InstallApp` component (beforeinstallprompt
+capture, iOS instructions) on the landing download section + Settings; SW cache v2 with manifest/icons
+moved to network-first; domain `onepercent.jssdigital.com.au` added to the Vercel project (awaiting one
+A record at the founder's registrar).
+
+**UX:** History shows the full v2 record (S1 claim, section prose with none-markers, Execution Rating +
+why, custom answers, none-count); Analytics gains the TR self-verdict sparkline and the cause-picker
+breakdown (SP5c/TP2c finally read); a dismissable 3-step first-run primer on /today; areas are editable
+(name/goal/metric labels/target — metric keys immutable for history integrity); the vault wheel has a
+keyboard path (arrows rotate, Shift ×5, steady hold catches — same detection); backup-staleness nudges
+on /today and Settings (`lastBackupAt`).
+
 ## 9 · Audit results (run against the built prototype, all screens screenshotted)
 
 | # | Test | Result | Evidence |

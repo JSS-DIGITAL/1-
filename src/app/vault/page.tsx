@@ -48,6 +48,7 @@ export default function VaultRoomPage() {
   const holdRef = useRef(0);
   const modeRef = useRef<RoomMode>("idle");
   const targetIdxRef = useRef(0);
+  const keyDenyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   modeRef.current = mode;
 
   const deny = useCallback(() => {
@@ -59,14 +60,20 @@ export default function VaultRoomPage() {
   const win = useCallback(
     (m: "skill" | "combination" | "master") => {
       const item = openVault(m);
-      if (!item) return;
+      if (!item) {
+        // Guarded out (already opened today, master not armed): clean refusal.
+        setMode("idle");
+        setGlow(0);
+        deny();
+        return;
+      }
       setLoot(item);
       setMode("open");
       setGlow(0);
       animate(wheelRot, 0, { duration: 0.4 });
       accRef.current = 0;
     },
-    [openVault, wheelRot]
+    [openVault, wheelRot, deny]
   );
 
   // Sweet-spot detection: sampled — holding still fires no pan events.
@@ -163,6 +170,25 @@ export default function VaultRoomPage() {
             key={`shudder-${deniedKey}`}
             animate={deniedKey > 0 ? { x: [0, -7, 6, -4, 2, 0] } : { x: 0 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
+            tabIndex={0}
+            role="application"
+            aria-label="The vault wheel. Left and right arrows rotate it (hold Shift for speed); hold it steady where the marker burns to catch a sweet spot."
+            className="rounded-[var(--radius-md)] outline-none focus-visible:ring-1 focus-visible:ring-accent/50"
+            onKeyDown={(e) => {
+              if (mode === "open") return;
+              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+              e.preventDefault();
+              const step = (e.key === "ArrowRight" ? 3 : -3) * (e.shiftKey ? 5 : 1);
+              accRef.current += step;
+              if (gameOn) wheelRot.set(accRef.current);
+              else {
+                wheelRot.set(22 * Math.tanh(accRef.current / 60));
+                if (keyDenyTimer.current) clearTimeout(keyDenyTimer.current);
+                keyDenyTimer.current = setTimeout(() => {
+                  if (Math.abs(wheelRot.get()) > 5) deny();
+                }, 500);
+              }
+            }}
           >
             <InteractiveVaultSvg
               wheelRot={wheelRot}

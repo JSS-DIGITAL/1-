@@ -33,3 +33,19 @@ for (const j of jobs) {
   await sharp(Buffer.from(tile(j.pad))).resize(j.size, j.size).png().toFile(j.file);
   console.log("wrote", j.file);
 }
+
+// Social preview card (og:image), 1200×630.
+const og = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="${BG}"/>
+  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="#232a26" stroke-width="2"/>
+  <text x="90" y="300" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="200" letter-spacing="-8">
+    <tspan fill="${INK}">1</tspan><tspan fill="${EMERALD}">%</tspan>
+  </text>
+  <text x="92" y="380" font-family="Georgia, serif" font-size="40" fill="${INK}" opacity="0.92">The floor, not the ceiling.</text>
+  <text x="92" y="440" font-family="monospace" font-size="24" fill="#8d968f">Student records reality. Teacher judges the record.</text>
+  <text x="92" y="478" font-family="monospace" font-size="24" fill="#8d968f">One correction, one mission, every day.</text>
+  <rect x="92" y="520" width="360" height="8" rx="4" fill="${EMERALD}" opacity="0.85"/>
+</svg>`;
+await sharp(Buffer.from(og)).png().toFile("public/og.png");
+console.log("wrote public/og.png");
