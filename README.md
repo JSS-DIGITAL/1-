@@ -1,36 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 1% — personal performance system
 
-## Getting Started
+**The floor, not the ceiling.** Live at [one-percent-eta.vercel.app](https://one-percent-eta.vercel.app) (soon `onepercent.jssdigital.com.au`).
 
-First, run the development server:
+One person, two mental states. The **Student** records the day — facts, numbers, what was dodged. The record **seals into the vault**, permanently. The **Teacher** reads it like a coach reading a report: one weakness, one mission for tomorrow, one stake on your own word. The economy pays for honesty and calibration — never for claimed success.
+
+## Stack
+
+Next.js (App Router) · Tailwind · Framer Motion · device-local persistence (localStorage — no backend, no accounts server; signups flow to the founder's n8n pipeline) · installable PWA.
+
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev   # port 3030
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## The two contracts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Read these before changing anything — every decision and founder deviation is logged with reasoning:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- [`QUESTION_FRAMEWORK.md`](QUESTION_FRAMEWORK.md) — the question set, the honesty-engine law, the economy amendments (§11–12).
+- [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) — tokens, the mode system, and a running log of every visual pass (§8a–8j).
 
-## Learn More
+## Deploys
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Push to `main` → Vercel auto-deploys (project `one-percent`). Manual: `npx vercel deploy --prod`.
