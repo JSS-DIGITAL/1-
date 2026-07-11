@@ -20,6 +20,7 @@ import {
   ShieldCard,
 } from "@/components/economy-ui";
 import { candorForQuestion } from "@/lib/economy";
+import { kcalOf } from "@/lib/health";
 import { daysSinceBackup } from "@/lib/persist";
 import { dayOffset } from "@/lib/mock";
 import { useAnalytics, useApp, useAreaSeries, useEconomy, useHardLine, useYesterdayMission } from "@/lib/store";
@@ -104,6 +105,9 @@ export default function TodayPage() {
       <Card className="mt-[var(--gap)]">
         <ObjectivesStrip resolved={objResolved} sealed={objSealed} avoided={objAvoided} />
       </Card>
+
+      {/* Health summary — dashboard glance, not loop wiring. */}
+      <HealthTeaser />
 
       {/* The vault teaser — tonight's combination progress. */}
       <Card className="mt-[var(--gap)]">
@@ -356,5 +360,42 @@ function BackupNudge() {
     >
       {days === null ? "no backup taken yet" : `last backup ${days} days ago`} — export one in Settings →
     </Link>
+  );
+}
+
+/** Health at a glance — numbers live on /health, this is just the door. */
+function HealthTeaser() {
+  const { healthDays, healthGoals } = useApp();
+  const day = healthDays.find((d) => d.date === dayOffset(0));
+  const eaten = kcalOf(day);
+  const target = healthGoals.kcalTarget;
+  const lastWeight = healthDays
+    .filter((d) => d.weightKg !== undefined)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-1)[0]?.weightKg;
+  return (
+    <Card className="mt-[var(--gap)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="type-mono flex flex-wrap items-center gap-x-5 gap-y-1 text-[0.75rem] text-muted">
+          <Label>Health</Label>
+          <span>
+            <span className="text-accent">{eaten}</span>
+            {target ? ` / ${target}` : ""} kcal
+            {target && eaten <= target ? ` · ${target - eaten} left` : ""}
+          </span>
+          <span>
+            water <span className="text-ink">{((day?.waterMl ?? 0) / 1000).toFixed(2).replace(/\.?0+$/, "") || "0"}L</span>
+          </span>
+          {lastWeight !== undefined && (
+            <span>
+              weight <span className="text-ink">{lastWeight}kg</span>
+            </span>
+          )}
+        </div>
+        <Link href="/health" className="type-mono text-[0.75rem] text-accent underline decoration-dotted underline-offset-2 hover:text-ink">
+          log the day →
+        </Link>
+      </div>
+    </Card>
   );
 }

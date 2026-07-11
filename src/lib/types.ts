@@ -148,6 +148,63 @@ export interface LedgerEntry {
   note: string;
 }
 
+// ---- Health (separate section — the loop and economy never touch it) ----
+
+export type MealSlot = "breakfast" | "lunch" | "dinner" | "snack";
+
+export interface FoodEntry {
+  id: string;
+  name: string;
+  /** Per single serving; the logged total is kcal × qty. */
+  kcal: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  meal: MealSlot;
+  qty: number;
+}
+
+export interface Workout {
+  id: string;
+  type: string;
+  minutes: number;
+}
+
+export interface HealthDay {
+  date: string;
+  foods: FoodEntry[];
+  waterMl: number;
+  steps?: number;
+  weightKg?: number;
+  sleepH?: number;
+  workouts: Workout[];
+}
+
+export interface HealthProfile {
+  sex: "male" | "female";
+  age: number;
+  heightCm: number;
+  weightKg: number;
+  activity: "sedentary" | "light" | "moderate" | "active" | "athlete";
+}
+
+export interface HealthGoals {
+  kcalTarget?: number;
+  proteinTarget?: number;
+  waterTargetMl: number;
+  stepTarget?: number;
+  weightTarget?: { kg: number; by: string };
+  profile?: HealthProfile;
+}
+
+export interface SavedFood {
+  name: string;
+  kcal: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+}
+
 // ---- Account (community registration; device-local until sync ships) ----
 
 export interface Account {

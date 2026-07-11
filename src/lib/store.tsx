@@ -37,6 +37,8 @@ import type {
   AnswerValue,
   DayRecord,
   FocusLog,
+  HealthDay,
+  HealthGoals,
   LedgerEntry,
   Mission,
   MissionOutcome,
@@ -44,8 +46,10 @@ import type {
   MotivationItem,
   Prefs,
   Recurrence,
+  SavedFood,
   VaultState,
 } from "./types";
+import { DEFAULT_HEALTH_GOALS, emptyHealthDay } from "./health";
 
 export interface AccentPair {
   accent: string;
@@ -71,6 +75,9 @@ export interface Persisted {
   pinnedLine: string | null;
   weeklyDoneWeek: string | null;
   account: Account | null;
+  healthDays: HealthDay[];
+  healthGoals: HealthGoals;
+  savedFoods: SavedFood[];
 }
 
 /** Guest sessions ("try free") never write to the device. Tab-scoped. */
@@ -159,6 +166,13 @@ interface AppState {
   vault: VaultState;
   spendVaultAttempt: () => boolean;
   openVault: (method: CrackMethod) => VaultItem | null;
+  /** Health (separate section — no loop/economy contact). */
+  healthDays: HealthDay[];
+  healthGoals: HealthGoals;
+  savedFoods: SavedFood[];
+  updateHealthDay: (date: string, patch: Partial<Omit<HealthDay, "date">>) => void;
+  setHealthGoals: (patch: Partial<HealthGoals>) => void;
+  addSavedFood: (food: SavedFood) => void;
   /** Device-local persistence controls (Settings → data). */
   hydrated: boolean;
   loadDemo: () => void;
@@ -208,6 +222,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [vault, setVault] = useState<VaultState>(() => makeEmptyVault());
   const [account, setAccountState] = useState<Account | null>(null);
   const [isGuest, setIsGuest] = useState(false);
+  const [healthDays, setHealthDays] = useState<HealthDay[]>([]);
+  const [healthGoals, setHealthGoalsState] = useState<HealthGoals>(DEFAULT_HEALTH_GOALS);
+  const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
 
   const applySaved = useCallback((saved: Persisted) => {
     const today = dayOffset(0);
@@ -224,6 +241,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPinnedLine(saved.pinnedLine ?? null);
     setWeeklyDoneWeek(saved.weeklyDoneWeek ?? null);
     setAccountState(saved.account ?? null);
+    setHealthDays(saved.healthDays ?? []);
+    setHealthGoalsState(saved.healthGoals ?? DEFAULT_HEALTH_GOALS);
+    setSavedFoods(saved.savedFoods ?? []);
     const v = saved.vault ?? makeEmptyVault();
     // Yesterday's honesty doesn't open tonight's vault: stale digits reset.
     setVault(
@@ -305,12 +325,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     pinnedLine,
     weeklyDoneWeek,
     account,
+    healthDays,
+    healthGoals,
+    savedFoods,
   };
   useEffect(() => {
     if (!hydrated || isGuest) return;
     saveStateDebounced(snapshot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, isGuest, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek, account]);
+  }, [hydrated, isGuest, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek, account, healthDays, healthGoals, savedFoods]);
+
+  // ---- Health actions (separate section; loop and economy never touch it) ----
+
+  const updateHealthDay = useCallback((date: string, patch: Partial<Omit<HealthDay, "date">>) => {
+    setHealthDays((days) => {
+      const existing = days.find((d) => d.date === date);
+      if (existing) return days.map((d) => (d.date === date ? { ...d, ...patch } : d));
+      return [...days, { ...emptyHealthDay(date), ...patch }];
+    });
+  }, []);
+
+  const setHealthGoals = useCallback((patch: Partial<HealthGoals>) => {
+    setHealthGoalsState((g) => ({ ...g, ...patch }));
+  }, []);
+
+  const addSavedFood = useCallback((food: SavedFood) => {
+    setSavedFoods((s) => {
+      const key = food.name.trim().toLowerCase();
+      if (!key) return s;
+      return [...s.filter((f) => f.name.trim().toLowerCase() !== key), { ...food, name: food.name.trim() }];
+    });
+  }, []);
 
   /** The full snapshot — Settings export uses this so backups miss nothing. */
   const exportSnapshot = useCallback((): Persisted => snapshot, [snapshot]);
@@ -348,6 +393,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       masterAvailable: false,
       unlocks: [],
     });
+    // Demo health: ten days, weight trending down, believable intake.
+    const demoDays: HealthDay[] = [];
+    for (let i = 9; i >= 0; i--) {
+      const date = dayOffset(-i);
+      const kcalBase = 1900 + ((i * 137) % 600);
+      demoDays.push({
+        date,
+        foods: [
+          { id: `d${i}-1`, name: "Oats (1 cup cooked)", kcal: 160, protein: 6, carbs: 27, fat: 3, meal: "breakfast", qty: 1 },
+          { id: `d${i}-2`, name: "Chicken & rice bowl", kcal: 550, protein: 40, carbs: 60, fat: 12, meal: "lunch", qty: 1 },
+          { id: `d${i}-3`, name: "Steak (200g cooked)", kcal: 440, protein: 56, carbs: 0, fat: 24, meal: "dinner", qty: 1 },
+          { id: `d${i}-4`, name: "Protein shake (1 scoop + water)", kcal: 120, protein: 25, carbs: 3, fat: 1, meal: "snack", qty: 1 },
+          { id: `d${i}-5`, name: "Filler", kcal: kcalBase - 1270, protein: 10, carbs: 40, fat: 12, meal: "snack", qty: 1 },
+        ],
+        waterMl: 1500 + ((i * 250) % 1500),
+        steps: 6000 + ((i * 913) % 6000),
+        weightKg: +(84 - (9 - i) * 0.16).toFixed(1),
+        sleepH: 6.5 + ((i * 0.5) % 2),
+        workouts: i % 2 === 0 ? [{ id: `w${i}`, type: "Gym", minutes: 55 }] : [],
+      });
+    }
+    setHealthDays(demoDays);
+    setHealthGoalsState({
+      kcalTarget: 2200,
+      proteinTarget: 160,
+      waterTargetMl: 3000,
+      stepTarget: 8000,
+      weightTarget: { kg: 80, by: "end of quarter" },
+      profile: { sex: "male", age: 28, heightCm: 180, weightKg: 84, activity: "moderate" },
+    });
+    setSavedFoods([]);
     setTodayDone(false);
   }, []);
 
@@ -365,6 +441,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPinnedLine(null);
     setWeeklyDoneWeek(null);
     setVault(makeEmptyVault());
+    setHealthDays([]);
+    setHealthGoalsState(DEFAULT_HEALTH_GOALS);
+    setSavedFoods([]);
     setTodayDone(false);
   }, []);
 
@@ -382,6 +461,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (d.prefs) setPrefsState((p) => ({ ...p, ...d.prefs }));
     if (d.accents) setAccents(d.accents);
     if (d.vault) setVault(d.vault);
+    if (Array.isArray(d.healthDays)) setHealthDays(d.healthDays);
+    if (d.healthGoals) setHealthGoalsState(d.healthGoals);
+    if (Array.isArray(d.savedFoods)) setSavedFoods(d.savedFoods);
     setWeeklyDoneWeek(d.weeklyDoneWeek ?? null);
     setTodayDone(d.records.some((r) => r.date === dayOffset(0)));
     return true;
@@ -703,6 +785,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     vault,
     spendVaultAttempt,
     openVault,
+    healthDays,
+    healthGoals,
+    savedFoods,
+    updateHealthDay,
+    setHealthGoals,
+    addSavedFood,
     hydrated,
     loadDemo,
     wipeAll,

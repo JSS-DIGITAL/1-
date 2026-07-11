@@ -6,13 +6,14 @@ import { useApp } from "@/lib/store";
 import { PercentGlyph } from "./ui";
 
 const NAV = [
-  { href: "/today", label: "Today" },
-  { href: "/areas", label: "Areas" },
-  { href: "/vault", label: "Vault" },
-  { href: "/history", label: "History" },
-  { href: "/analytics", label: "Analytics" },
-  { href: "/motivation", label: "Fuel" },
-  { href: "/settings", label: "Settings" },
+  { href: "/today", label: "Today", short: "Today" },
+  { href: "/areas", label: "Areas", short: "Areas" },
+  { href: "/vault", label: "Vault", short: "Vault" },
+  { href: "/health", label: "Health", short: "Health" },
+  { href: "/history", label: "History", short: "Past" },
+  { href: "/analytics", label: "Analytics", short: "Stats" },
+  { href: "/motivation", label: "Fuel", short: "Fuel" },
+  { href: "/settings", label: "Settings", short: "Config" },
 ];
 
 export const MODE_BANNER = { student: "student · record", teacher: "teacher · judge" } as const;
@@ -81,7 +82,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </main>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav — compact labels so eight items fit at 375px */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-bg/90 backdrop-blur md:hidden">
         {NAV.map((n) => {
           const active = pathname === n.href;
@@ -89,11 +90,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Link
               key={n.href}
               href={n.href}
-              className={`flex-1 py-3 text-center text-[0.625rem] font-semibold uppercase tracking-[0.1em] ${
+              className={`min-w-0 flex-1 overflow-hidden py-3 text-center text-[0.5625rem] font-semibold uppercase tracking-[0.04em] ${
                 active ? "text-accent" : "text-muted/70"
               }`}
             >
-              {n.label}
+              {n.short}
             </Link>
           );
         })}

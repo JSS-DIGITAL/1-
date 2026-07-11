@@ -369,6 +369,26 @@ breakdown (SP5c/TP2c finally read); a dismissable 3-step first-run primer on /to
 keyboard path (arrows rotate, Shift ×5, steady hold catches — same detection); backup-staleness nudges
 on /today and Settings (`lastBackupAt`).
 
+## 8k · Health section (added 2026-07-11, founder feature)
+
+`/health` ("The machine you run on") — calories/macros, water, weight, steps, sleep, workouts, goals,
+trends. **Deliberately separate from the loop** (founder ruling): the review never reads it, logging pays
+no bp, the economy is untouched. **Color discipline:** accent + neutrals only — gold stays money, loot
+colors stay loot; the over-target trend bar is `ink/70`, never red (no failure theatre in health).
+
+- **Food data**: curated offline `FOOD_LIBRARY` (~60 AU-flavored foods/meals with kcal + macros) +
+  "My foods" (manual entries opt-save for one-tap reuse, tagged `mine` in search). No API, no keys.
+- **Targets**: Mifflin-St Jeor BMR → activity-factored TDEE → lose/maintain/gain suggestions
+  (−500/0/+300 kcal; protein 2.0/1.6/1.8 g/kg), one-tap apply; "not medical advice" lines on the page
+  header and calculator.
+- **Logging**: per-meal quick-pick with portion multipliers, tap-glass water pips (250ml), day-scoped
+  weight/steps/sleep, workout list; 7-day date selector for back-filling.
+- **Trends**: 7-day kcal bars vs target, 30-day weight Sparkline, on-target day streak (info only).
+- All state rides the persisted snapshot (healthDays/healthGoals/savedFoods) — guests save nothing,
+  export/import round-trips automatically. `/today` gets a one-line glance card (door, not wiring).
+- Mobile: the 8-item bottom nav uses compact labels (Past/Stats/Config) at 0.5625rem; grid columns carry
+  `min-w-0` — the health page introduced the app's first grid-item min-content overflow at 375px.
+
 ## 9 · Audit results (run against the built prototype, all screens screenshotted)
 
 | # | Test | Result | Evidence |
