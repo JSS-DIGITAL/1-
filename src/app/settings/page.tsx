@@ -3,11 +3,13 @@
 // Settings — the token architecture made visible: mode preview, accent swaps
 // inside contrast guardrails, question-set preferences, export stub.
 
+import { useRef, useState } from "react";
 import { Shell } from "@/components/shell";
 import { Button, Card, Label } from "@/components/ui";
 import { RankBadge } from "@/components/economy-ui";
 import { RANKS } from "@/lib/economy";
 import { ACCENT_PRESETS, useApp, useEconomy } from "@/lib/store";
+import { RARITIES, VAULT_ACCENTS, VAULT_LOOT } from "@/lib/vault";
 import type { Mode } from "@/lib/types";
 
 const MODE_BG: Record<Mode, string> = { student: "#0a0c0b", teacher: "#0d0a0b" };
@@ -28,19 +30,32 @@ function contrast(a: string, b: string): number {
 }
 
 export default function SettingsPage() {
-  const { mode, setMode, accents, setAccent, prefs, setPrefs, records, missions, areas, ledger } = useApp();
+  const { mode, setMode, accents, setAccent, prefs, setPrefs, records, missions, areas, ledger, vault, loadDemo, wipeAll, importData } = useApp();
   const econ = useEconomy();
+  const [dataMsg, setDataMsg] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const exportData = () => {
-    const blob = new Blob([JSON.stringify({ areas, records, missions, ledger }, null, 2)], {
+    // The full device state — this file IS the backup.
+    const blob = new Blob([JSON.stringify({ areas, records, missions, ledger, prefs, vault }, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "one-percent-export.json";
+    a.download = "one-percent-backup.json";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const onImportFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const ok = importData(JSON.parse(await file.text()));
+      setDataMsg(ok ? "backup restored — everything is back on the books." : "that file isn't a 1% backup.");
+    } catch {
+      setDataMsg("that file isn't a 1% backup.");
+    }
   };
 
   return (
@@ -107,9 +122,48 @@ export default function SettingsPage() {
                   </button>
                 );
               })}
+              {/* Vault exclusives — won at the vault, never bought. */}
+              {VAULT_ACCENTS.filter((va) => va.mode === m).map((va) => {
+                const owned = vault.unlocks.includes(va.itemId);
+                const active = accents[m].accent === va.pair.accent;
+                const rarity = VAULT_LOOT.find((i) => i.id === va.itemId)?.rarity ?? "common";
+                return (
+                  <button
+                    key={va.itemId}
+                    onClick={() => owned && setAccent(m, { ...va.pair, rankReq: 0 })}
+                    disabled={!owned}
+                    className={`flex items-center gap-2.5 rounded-[var(--radius-sm)] border px-3 py-2 text-[0.8125rem] transition-colors duration-[var(--dur-fast)] ${
+                      active ? "border-accent" : "border-line hover:border-muted"
+                    } ${owned ? "" : "opacity-40"}`}
+                    style={owned ? { borderColor: RARITIES[rarity].color } : undefined}
+                  >
+                    <span className="h-4 w-4 rounded-full" style={{ background: va.pair.accent }} />
+                    <span className="text-ink">{va.pair.name}</span>
+                    <span className="type-mono text-[0.6875rem]" style={{ color: RARITIES[rarity].color }}>
+                      {owned ? RARITIES[rarity].name.toLowerCase() : "crack the vault"}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </Card>
         ))}
+
+        {vault.unlocks.includes("feat-seal-label") && (
+          <Card>
+            <Label className="mb-3">The Signet — legendary vault unlock</Label>
+            <p className="mb-3 text-[0.8125rem] text-muted">
+              Your words, pressed into every seal from tonight on.
+            </p>
+            <input
+              className="w-full max-w-xs rounded-[var(--radius-sm)] border border-line bg-surface-2 px-3 py-2.5 text-[0.9375rem] text-ink outline-none placeholder:text-muted/50 focus:border-accent"
+              placeholder="e.g. Sealed by the operator"
+              maxLength={32}
+              value={prefs.customSealLabel ?? ""}
+              onChange={(e) => setPrefs({ customSealLabel: e.target.value })}
+            />
+          </Card>
+        )}
 
         <Card>
           <Label className="mb-3">Experience</Label>
@@ -198,11 +252,51 @@ export default function SettingsPage() {
         <Card>
           <Label className="mb-3">Data</Label>
           <p className="mb-3 text-[0.8125rem] text-muted">
-            The record belongs to you. Export everything as JSON.
+            The record belongs to you — it lives on this device only, no account, no cloud. The export is
+            your backup: take one before long absences (phone browsers can evict storage after weeks of
+            disuse) or before switching devices.
           </p>
-          <Button variant="ghost" onClick={exportData}>
-            Export the record
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" onClick={exportData}>
+              Export backup
+            </Button>
+            <Button variant="ghost" onClick={() => fileRef.current?.click()}>
+              Import backup
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (window.confirm("Load the demo world? Your current data will be replaced — export first if it matters.")) {
+                  loadDemo();
+                  setDataMsg("demo world loaded.");
+                }
+              }}
+            >
+              Load demo data
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (window.confirm("Wipe everything on this device? This cannot be undone — export first if it matters.")) {
+                  wipeAll();
+                  setDataMsg("clean slate. day one starts now.");
+                }
+              }}
+            >
+              <span style={{ color: "#FF4D42" }}>Wipe everything</span>
+            </Button>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={(e) => {
+              onImportFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          {dataMsg && <p className="type-mono mt-3 text-[0.75rem] text-muted">{dataMsg}</p>}
         </Card>
       </div>
     </Shell>

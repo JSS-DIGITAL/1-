@@ -6,11 +6,12 @@
 import { Shell } from "@/components/shell";
 import { CalibrationPlot, CompoundCurve, CountUp, DensityStrip, RecurrenceBars, Sparkline } from "@/components/charts";
 import { BountyCard, GripDial, PRBoard, TrophyCabinet } from "@/components/economy-ui";
-import { RANKS } from "@/lib/economy";
+import { noneCountOf, RANKS } from "@/lib/economy";
 import { Card, Label, StatTile } from "@/components/ui";
-import { useAnalytics, useEconomy } from "@/lib/store";
+import { useAnalytics, useApp, useEconomy } from "@/lib/store";
 
 export default function AnalyticsPage() {
+  const { records } = useApp();
   const a = useAnalytics();
   const econ = useEconomy();
   const fullDays = a.density.filter((d) => d.kind === "full").length;
@@ -37,6 +38,11 @@ export default function AnalyticsPage() {
           label="Records · 30d"
           value={`${fullDays + mvdDays}`}
           detail={`${fullDays} full · ${mvdDays} minimum`}
+        />
+        <StatTile
+          label="“None” answers · 30d"
+          value={String(records.slice(-30).reduce((s, r) => s + (r.noneCount ?? noneCountOf(r.answers)), 0))}
+          detail="explicit nothing — legal, and tracked"
         />
       </div>
 

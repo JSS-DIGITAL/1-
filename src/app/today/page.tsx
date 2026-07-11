@@ -24,7 +24,7 @@ import { useAnalytics, useApp, useAreaSeries, useEconomy, useHardLine, useYester
 
 export default function TodayPage() {
   const router = useRouter();
-  const { areas, todayDone, setPendingS1, missions, prefs, records, shieldHeld, buyShield, weeklyDone } =
+  const { areas, todayDone, setPendingS1, missions, prefs, records, shieldHeld, buyShield, weeklyDone, vault } =
     useApp();
   const standing = useYesterdayMission();
   const analytics = useAnalytics();
@@ -98,6 +98,36 @@ export default function TodayPage() {
       {/* Daily objectives — the quest strip. */}
       <Card className="mt-[var(--gap)]">
         <ObjectivesStrip resolved={objResolved} sealed={objSealed} avoided={objAvoided} />
+      </Card>
+
+      {/* The vault teaser — tonight's combination progress. */}
+      <Card className="mt-[var(--gap)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-4">
+            <Label>The vault</Label>
+            <div className="flex items-center gap-2" aria-label="Combination digits earned">
+              {[vault.digits.seal, vault.digits.candor, vault.digits.calibration].map((earned, i) => (
+                <span
+                  key={i}
+                  className="type-mono grid h-7 w-7 place-items-center rounded-full border text-[0.75rem]"
+                  style={{
+                    borderColor: earned ? "var(--gold)" : "var(--line)",
+                    color: earned ? "var(--gold)" : "var(--muted)",
+                  }}
+                >
+                  {earned ? vault.digitValues[i] : "?"}
+                </span>
+              ))}
+            </div>
+            <span className="type-mono text-[0.6875rem] text-muted">
+              {vault.attempts} crack attempt{vault.attempts === 1 ? "" : "s"} banked
+              {vault.masterAvailable ? " · MASTER VAULT ARMED" : ` · streak ${vault.streak}/7`}
+            </span>
+          </div>
+          <Link href="/vault" className="type-mono text-[0.75rem] underline decoration-dotted underline-offset-2 hover:text-ink" style={{ color: "var(--gold)" }}>
+            the vault is waiting →
+          </Link>
+        </div>
       </Card>
 
       <div className="mt-[var(--gap)] grid gap-[var(--gap)] lg:grid-cols-[1.6fr_1fr]">

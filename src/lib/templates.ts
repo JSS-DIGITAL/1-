@@ -15,6 +15,12 @@ export const AREA_TEMPLATES: AreaTemplate[] = [
     ],
     standards: ["Hard calls before email", "No pitch without research"],
     target: { metricKey: "booked", value: 10, by: "end of month" },
+    // Domain-tuned benchmarks (QUESTION_FRAMEWORK.md §9 domain spot-check).
+    overrides: {
+      S2: { example: "12 cold calls · proposal v2 sent · 2 meetings booked" },
+      S4: { example: "Avoided the two biggest prospects · easy follow-up emails instead." },
+      T4: { example: "9am, desk, phone in drawer: call the 3 largest prospects before opening email." },
+    },
   },
   {
     name: "Strength",
@@ -25,6 +31,11 @@ export const AREA_TEMPLATES: AreaTemplate[] = [
     ],
     standards: ["Full depth or it doesn't count", "Log every set"],
     target: { metricKey: "volume", value: 6000, by: "quarter end" },
+    overrides: {
+      S2: { example: "5×5 squat @ 100kg · 20-min row · every set logged" },
+      S4: { example: "Avoided the last squat set · extra curls instead." },
+      T4: { example: "6am, gym, before phone: 3×5 @ 102.5kg, full depth." },
+    },
   },
   {
     name: "Language",
@@ -35,6 +46,11 @@ export const AREA_TEMPLATES: AreaTemplate[] = [
     ],
     standards: ["Production before recognition"],
     target: { metricKey: "minutes", value: 45, by: "daily by December" },
+    overrides: {
+      S2: { example: "Anki 142 cards · 15-min tutor call · 10 spoken sentences recorded" },
+      S4: { example: "Avoided the speaking drill · passive video instead." },
+      T4: { example: "7pm, kitchen, timer on: 10 spoken sentences recorded." },
+    },
   },
   {
     name: "Study",

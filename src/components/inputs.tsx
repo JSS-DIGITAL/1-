@@ -34,9 +34,9 @@ export function ShapeInput({
     case "binary":
       return <BinaryInput value={value} onChange={onChange} evidence={shape.evidence} />;
     case "enum":
-      return <EnumInput value={value} onChange={onChange} options={shape.options} note={shape.note} />;
+      return <EnumInput value={value} onChange={onChange} options={shape.options} note={shape.note} audit={shape.audit} />;
     case "scale":
-      return <ScaleInput value={value} onChange={onChange} />;
+      return <ScaleInput value={value} onChange={onChange} why={shape.why} />;
     case "count":
       return <CountInput value={value} onChange={onChange} metrics={metrics ?? []} prevValues={prevValues} />;
     case "list":
@@ -56,9 +56,13 @@ export function isAnswered(shape: AnswerShape, v: AnswerValue | undefined): bool
     case "binary":
       return shape.kind === "binary" && (!shape.evidence || Boolean(v.evidence?.trim()));
     case "enum":
-      return Boolean(v.value) && (shape.kind !== "enum" || !shape.note || Boolean(v.note?.trim()));
+      return (
+        Boolean(v.value) &&
+        (shape.kind !== "enum" || !shape.note || Boolean(v.note?.trim())) &&
+        (shape.kind !== "enum" || !shape.audit || v.audit !== undefined)
+      );
     case "scale":
-      return v.value >= 0;
+      return v.value >= 0 && (shape.kind !== "scale" || !shape.why || Boolean(v.why?.trim()));
     case "count":
       return Object.keys(v.values).length > 0;
     case "list":
@@ -122,11 +126,13 @@ function EnumInput({
   onChange,
   options,
   note,
+  audit,
 }: {
   value: AnswerValue | undefined;
   onChange: (v: AnswerValue) => void;
   options: string[];
   note?: boolean;
+  audit?: boolean;
 }) {
   const v = value?.kind === "enum" ? value : undefined;
   return (
@@ -137,7 +143,7 @@ function EnumInput({
           <textarea
             className={proseCls}
             value={v?.note ?? ""}
-            onChange={(e) => onChange({ kind: "enum", value: v?.value ?? "", note: e.target.value })}
+            onChange={(e) => onChange({ kind: "enum", value: v?.value ?? "", note: e.target.value, audit: v?.audit })}
             placeholder="Named precisely, not a theory about character"
             rows={1}
           />
@@ -149,7 +155,7 @@ function EnumInput({
           <button
             key={o}
             type="button"
-            onClick={() => onChange({ kind: "enum", value: o, note: v?.note })}
+            onClick={() => onChange({ kind: "enum", value: o, note: v?.note, audit: v?.audit })}
             className={`rounded-[var(--radius-sm)] border py-3 text-[0.875rem] font-medium capitalize transition-colors duration-[var(--dur-fast)] ${
               v?.value === o
                 ? "border-accent bg-accent text-accent-ink"
@@ -160,6 +166,27 @@ function EnumInput({
           </button>
         ))}
       </div>
+      {audit && v?.value && (
+        <div className="rise">
+          <Label className="mb-1.5">Would the evidence survive an outside audit?</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {([true, false] as const).map((b) => (
+              <button
+                key={String(b)}
+                type="button"
+                onClick={() => onChange({ kind: "enum", value: v.value, note: v.note, audit: b })}
+                className={`rounded-[var(--radius-sm)] border py-2.5 text-[0.875rem] font-medium transition-colors duration-[var(--dur-fast)] ${
+                  v.audit === b
+                    ? "border-accent bg-accent text-accent-ink"
+                    : "border-line bg-surface-2 text-ink hover:border-muted"
+                }`}
+              >
+                {b ? "It holds" : "It would not"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -167,11 +194,13 @@ function EnumInput({
 function ScaleInput({
   value,
   onChange,
+  why,
 }: {
   value: AnswerValue | undefined;
   onChange: (v: AnswerValue) => void;
+  why?: boolean;
 }) {
-  const v = value?.kind === "scale" ? value.value : undefined;
+  const v = value?.kind === "scale" ? value : undefined;
   return (
     <div>
       <div className="grid grid-cols-11 gap-1">
@@ -179,9 +208,9 @@ function ScaleInput({
           <button
             key={n}
             type="button"
-            onClick={() => onChange({ kind: "scale", value: n })}
+            onClick={() => onChange({ kind: "scale", value: n, why: v?.why })}
             className={`type-mono rounded-[var(--radius-sm)] border py-2.5 text-[0.8125rem] transition-colors duration-[var(--dur-fast)] ${
-              v === n
+              v?.value === n
                 ? "border-accent bg-accent font-medium text-accent-ink"
                 : "border-line bg-surface-2 text-ink hover:border-muted"
             }`}
@@ -191,9 +220,31 @@ function ScaleInput({
         ))}
       </div>
       <div className="mt-2 flex justify-between text-[0.6875rem] text-muted">
-        <span>certain miss</span>
-        <span>certain completion</span>
+        {why ? (
+          <>
+            <span>below standard</span>
+            <span>at your standard</span>
+          </>
+        ) : (
+          <>
+            <span>certain miss</span>
+            <span>certain completion</span>
+          </>
+        )}
       </div>
+      {why && v && (
+        <div className="rise mt-4">
+          <Label className="mb-1.5">Why that number — from the record</Label>
+          <textarea
+            className={proseCls}
+            value={v.why ?? ""}
+            onChange={(e) => onChange({ kind: "scale", value: v.value, why: e.target.value })}
+            placeholder="The number is worthless without this. Cite the evidence."
+            rows={1}
+          />
+          <NoLimit />
+        </div>
+      )}
     </div>
   );
 }
@@ -282,27 +333,35 @@ function ListInput({
         </ul>
       )}
       {items.length < max && (
-        <div className="flex gap-2">
-          <input
-            className={fieldCls}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), add())}
-            placeholder="An artifact, a number, a submission"
-            maxLength={90}
-          />
-          <button
-            type="button"
-            onClick={add}
-            disabled={!draft.trim()}
-            className="rounded-[var(--radius-sm)] border border-line px-4 text-[0.875rem] text-ink hover:bg-surface-2 disabled:opacity-35"
-          >
-            Add
-          </button>
+        <div>
+          <div className="flex gap-2">
+            <input
+              className={fieldCls}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), add())}
+              onBlur={add}
+              placeholder="An artifact, a number, a submission"
+              maxLength={90}
+            />
+            <button
+              type="button"
+              onClick={add}
+              disabled={!draft.trim()}
+              className="rounded-[var(--radius-sm)] border border-line px-4 text-[0.875rem] text-ink hover:bg-surface-2 disabled:opacity-35"
+            >
+              Add
+            </button>
+          </div>
+          {draft.trim() && (
+            <p className="type-mono mt-1 text-[0.625rem] text-muted/70">
+              press Enter or Add to log it — it saves itself when you move on
+            </p>
+          )}
         </div>
       )}
       <div className="type-mono text-[0.6875rem] text-muted">
-        {items.length}/{max}
+        {items.length}/{max} logged
       </div>
     </div>
   );

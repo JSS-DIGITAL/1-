@@ -83,6 +83,19 @@ export function resolveWager(
 
 const NOTHING = /^\s*(nothing|none|n\/a|no)\s*\.?\s*$/i;
 
+/** An explicit "none" answer — legal everywhere, paid nowhere, always tracked. */
+export function isNoneText(s: string | undefined | null): boolean {
+  return Boolean(s && NOTHING.test(s));
+}
+
+/** Count of explicit-none text answers in a record (line + text shapes). */
+export function noneCountOf(answers: Record<string, AnswerValue>): number {
+  return Object.values(answers).reduce((n, v) => {
+    if (v.kind === "line" || v.kind === "text") return n + (isNoneText(v.value) ? 1 : 0);
+    return n;
+  }, 0);
+}
+
 export interface CandorBreakdown {
   bp: number;
   lines: { label: string; bp: number }[];

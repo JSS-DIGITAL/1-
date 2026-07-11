@@ -8,6 +8,7 @@ import { PercentGlyph } from "./ui";
 const NAV = [
   { href: "/today", label: "Today" },
   { href: "/areas", label: "Areas" },
+  { href: "/vault", label: "Vault" },
   { href: "/history", label: "History" },
   { href: "/analytics", label: "Analytics" },
   { href: "/motivation", label: "Fuel" },

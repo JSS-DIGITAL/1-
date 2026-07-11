@@ -489,6 +489,129 @@ remain un-buyable. Leaderboards were evaluated against the category and **delibe
 - **Unlimited prose answers.** The `line`/`text` shapes no longer enforce character caps; boxes auto-grow and advertise "no limit". Brevity remains *advice* (hints unchanged) — the Brevity test now reads "answerable well in a few sentences", not "enforced by the box".
 - **Hard lines.** Must-Not-Exist §4 is narrowed: motivational content is banned *inside the loop* (questions, answers, payouts) but permitted in the chrome as terse, aggressive one-liners (login, dashboard, arm screen, failed verdicts, empty states), user-disableable. Rationale: the founder wants the product to punch; the loop's analytical integrity is preserved by keeping the lines out of the questions and the math.
 
+## 12 · Amendment (2026-07-10): Framework v2 — sections, depth, and the user's own words
+
+**Founder decision, second major amendment.** The founder supplied a fuller questioning framework (7 Student + 8 Teacher sections, multi-question clusters, a depth-over-speed philosophy, an end-of-Teacher performance rating) and ruled on every conflict with v1. The result is a hybrid that keeps v1's data engine and adopts v2's thinking architecture.
+
+### 12.1 The hybrid law
+
+- **Sections are the thinking pathways.** The daily review is now 7 Student + 7 Teacher section screens. Each presents a *cluster of thinking triggers* (visible prompts) and one unlimited prose field. Triggers are **not form fields**: the user may answer all, some, or none — deeply or in summary. The app is a guided self-performance audit, not data entry.
+- **Anchors are the data spine.** The v1 shaped questions (S1–S5, ST1, T1–T6, + new TR) render inside their sections and **alone gate progression**. Everything that feeds a metric stays enforced; everything else is free depth.
+- **Voice split reaffirmed (emphatic):** Student clusters are first person ("What did I do?") — reporting my reality; Teacher clusters are second person ("What did you do?") — evaluating from outside. Never merge; the language triggers the mental state.
+- **Student observes, records, notices, captures. Teacher evaluates, interprets, diagnoses, corrects.** The Student identifies the gap; the Teacher diagnoses it.
+- **Depth over speed.** Time estimates removed from the arm screen. The pitch is the founder's line: *"The more seriously you analyse yourself, the more valuable the outcome becomes."* Time is not the goal; effort is not the goal; improvement is the goal. Length is never rewarded (prose pays 0 bp).
+
+### 12.2 The structures (built in `src/lib/framework.ts` as `SECTIONS`)
+
+| Student section | Anchors | Prose id | Teacher section | Anchors | Prose id |
+|---|---|---|---|---|---|
+| 1 The Day | — | SP1 | 1 Verdict & Audit | T1 (+ audit binary) | TP1 |
+| 2 Intentions vs Reality | S1 (ST1 on no) | SP2 | 2 The Gap (+ cause picker) | T2 | TP2 |
+| 3 Output & Numbers | S2, S3 | SP3 | 3 Weakness | T3 | TP3 |
+| 4 Learning & Change | — | SP4 | 4 Correction & Standards | — | TP4 |
+| 5 Friction & Avoidance (+ cause picker) | S4 | SP5 | 5 Patterns | — | TP5 |
+| 6 Conditions | S5 | SP6 | 6 Final Verdict & Rating | **TR** | TP6 |
+| 7 Handoff (seal lives here) | — | SP7 | 7 Mission (always last — ritual) | T4, T5, T6 | TP7 |
+
+Mission stays last (deviation from the founder's listed order): the reverse-shift ritual — one order on the desk — must remain the terminal act. Optional one-tap cause pickers (never gate): S§5 `knowledge/preparation/execution/external`, T§2 `planning/execution/priorities/knowledge/discipline/external`.
+
+### 12.3 Must-Not-Exist #5 narrowed: the Execution Rating (TR)
+
+A 0–10 end-of-Teacher self-assessment now exists — **hardened against the #5 failure mode**: it is named Execution Rating (never "day score"), asked *after* the full evaluation, anchored to evidence (the "why" citing the record is **required**; the number alone is worthless), tracked as its own metric (`self_assessment`), pays **0 bp**, and is never compared between users or fed to any gamification mechanic. #5's ban on *mood* scores stands; TR is a performance assessment checkpoint of the user against their own standards.
+
+### 12.4 Cut questions return — Student-voiced
+
+"What did I learn / what improved / what is worth remembering" return as Student §4 (Learning & Change) and §1/§7 triggers. The v1 cut targeted their *platitude* failure mode; the v2 ruling is that the Student may notice and record changes — the difference is the mental process, not the topic. The Student captures ("I improved X because I practiced it"); the Teacher interprets ("this improvement came from repetition — continue"). Emotional questions stay banned in both modes.
+
+### 12.5 Customization: the wording is the user's, the structure is not
+
+Per area (`Area.overrides`, `Area.customQuestions`, edited on `/areas`):
+
+- **Rewritable:** section names, purposes, trigger clusters, placeholders, benchmark examples; anchor prompts, hints, examples. Per-field reset-to-default; the default is always shown as the placeholder.
+- **Locked:** question ids, answer shapes, metrics, section order and count, the seal, the Mode Shift, MVD composition.
+- **Custom questions:** max 2 per area, `line`/`text` shape only, user picks the mode; asked in Handoff (student) or Final Verdict (teacher). They pay 0 bp (a self-authored question must never print money), never gate, and are skipped on MVD.
+- **The Law panel** sits beside the editor (6 plain-language lines distilled from §0 + §4, exported as `THE_LAW`).
+- **Soft lint** (warn, never block — the user stays sovereign) fires on rewordings of the *built-in* set matching §4 patterns: gratitude, feelings-as-subject, motivation ratings, day scores, pride-comfort, identity-whys. Custom questions are not linted; the Law stays visible.
+- §8's rotation defence is superseded where an area carries overrides (the user's own words beat rotated phrasings); the Settings toggle remains for un-customized areas as future work.
+
+### 12.6 The benchmark layer
+
+Every section and anchor may carry a founder-authored `example` — a model answer showing the expected altitude ("this is the benchmark: how to write and how to think"). Presented as **tap-to-reveal** ("see the benchmark") so the loop stays uncluttered; static under reduced motion; per-area overridable (starter packs ship domain-tuned examples from §9's spot-check table).
+
+### 12.7 Wording changelog (anchors; v1 → v2, clarity for a first-time user, intent preserved)
+
+| Q | Before | After | Why |
+|---|---|---|---|
+| S1 prompt | "Yesterday's mission: did I execute it?" | "Yesterday's mission — did I do it?" | "execute" is operator-speak; the binary is the point. |
+| S1 hint | "Yes or no. Then the evidence — something an outside audit would accept." | "Yes or no — 'sort of' is a no. Then the proof: something an outsider would accept." | Names the coward's answer explicitly; "proof/outsider" over "evidence/audit". |
+| S2 hint | "Evidence a stranger could verify — artifacts, numbers, submissions. Not activities." | "List each one — things an outsider could verify: files sent, reps done, calls made. 'Worked on X' doesn't count." | Concrete nouns; names the exact failure answer. |
+| S4 hint | "And name what filled that time instead. The replacement is the tell." | "'Nothing' is a legal answer — but the swap is the tell. What filled that time?" | Legalizes the honest "nothing" up front (§9 adversarial rule) while keeping the tell. |
+| S5 prompt | "Which condition most shaped execution today?" | "What condition most affected how I performed today?" | "shaped execution" was the least glanceable phrase in the set. |
+| T1 | enum only | enum + required evidence-audit binary ("Would the evidence survive an outside audit?") | Implements §3.1's documented `binary` half of T1, previously unbuilt. |
+| T5 hint scale labels | "certain miss / certain completion" | unchanged (wager); TR variant reads "below standard / at your standard" | The two scales must not read as the same instrument. |
+| — | — | TR added (§12.3) | Founder amendment. |
+
+Section prose ids `SP1–SP7`/`TP1–TP7` and cause ids `SP5c`/`TP2c` are new answer keys inside `DayRecord.answers`; all long-term metrics and the candor engine read only the anchor ids, so history stays comparable.
+
+### 12.8 Seal ritual extended (same day, founder ruling)
+
+The §2 Mode Shift's four beats are unchanged conceptually, but the seal act is now a ~6.5s cinematic
+(letter → vault → slam → wheels → lock → VAULTED badge → the line), played in full every day with **no
+skip** — the founder's reasoning: after the depth of Student mode, the wait is a deliberate mental rest
+before evaluation. MVD keeps its compressed shift (~1.7s). The temperature inversion no longer fires
+automatically: a blood-red **"Enter Teacher Mode"** gate appears after the line, and the user's click
+floods the screen blood-red — entering Teacher mode is now itself a deliberate act. Reduced-motion users
+get the static variant with an instant switch (accessibility, not a skip). Details: DESIGN_SYSTEM.md §8f.
+
+### 12.9 The explicit-none law + two repeals (2026-07-10, founder rulings after first use)
+
+1. **No silent blanks.** Every text field in the review — section prose, custom questions, and all anchors —
+   must contain *something* before the flow advances. The legal skip is writing **"none"** (or nothing/n-a/no,
+   per the candor engine's existing pattern): it pays nothing, it gates nothing, and it is **tracked** —
+   `DayRecord.noneCount` counts explicit-none answers per record (`noneCountOf` in economy.ts), the Teacher's
+   dossier marks them ("· none — tracked"), and `/analytics` shows the 30-day total. This extends S4/T2's
+   "none is data" logic to the whole record: an explicit nothing is honest; an empty box is invisible coasting.
+   This *supersedes* §12.1's "prose never gates" — the founder's original depth ruling stands (answer deeply,
+   summarise, or skip), but the skip must now be written down.
+2. **Blocked attempts explain themselves.** The advance button is always clickable; an incomplete click
+   refuses (button shake), shows a red line under each unmet field saying exactly what is required
+   (signal red — never the teacher ember), and scrolls to the first gap. Silent disabled buttons are banned.
+   The S2 list input also commits a typed-but-unadded item automatically when focus leaves it, so typed
+   text can no longer be silently lost.
+3. **Repealed: the MVD compressed Mode Shift.** §5's "compressed to the seal + the line" no longer applies —
+   the full vault cinematic plays on every path, every day (one ritual, founder ruling).
+
+### 12.10 The Vault Game (2026-07-10, founder economy amendment)
+
+The vault is now playable (`/vault`): a live, grabbable vault whose wheel budges against real resistance
+and snaps back — DENIED — for anyone who hasn't earned a way in. Two ways in, **and the method dictates
+the loot tier** (founder ruling):
+
+1. **The Combination** (high table): three digits earned by the day's honest acts, mapped one-to-one onto
+   the economy law — the **seal digit** (record sealed: *verifiable act*), the **candor digit** (a real
+   avoidance named in S4, not "none": *anti-flattering*), the **calibration digit** (the wager landed
+   within ±2 of the resolved outcome: *prediction-tested*). All three → dial them → the vault opens on
+   the uncommon-through-legendary table, and the Archive stands open until midnight.
+2. **The Skill Crack** (low table): a 20-second safe-cracking game — three hidden sweet spots, hold the
+   wheel steady where the marker burns. Attempts are earned **only by sealing a record** (cap 3), making
+   this the same class of mechanic as seal draws: a variable-ratio reward *on top of* the honest act,
+   never a payment for claimed success.
+3. **The Master Vault**: seven consecutive days with an open arms one jackpot open (epic/legendary/mythic),
+   then the streak resets. One normal open per day.
+
+**The rarity ladder** (founder ruling — Fortnite-style, quantity decreasing with rarity): Common grey →
+Uncommon green → Rare blue → Epic purple → Legendary gold → Mythic hot-gold (Master Vault only). Loot:
+bp hauls (ledger source `vault`), vault-exclusive accents, seal skins (shelf collectibles), feature
+unlocks (**The Third Question** — a 3rd custom-question slot; **The Signet** — a custom seal label), and
+the **Archive** (sealed records browsable as TOP-SECRET dossiers inside the open door; a legendary key
+makes it permanent). Owned unlockables re-rolled fall back to same-tier bp. Odds per method live in
+`METHOD_ODDS` (vault.ts).
+
+**Law check:** nothing in the vault pays for claimed success — attempts and digits are earned exclusively
+by sealing, admission, and calibration. **Residual risk (accepted):** the skill path adds a second
+variable-ratio surface to the same honest act that seal draws already reward; if usage shows the game
+displacing the review rather than crowning it, the attempt cap tightens first.
+
 ## Definition-of-done check
 
 - Every kept question audited (Stage 2 dispositions + §8 tests applied; failures rewritten or cut) ✅

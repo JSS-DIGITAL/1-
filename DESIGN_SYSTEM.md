@@ -238,6 +238,93 @@ Habitica/Streaks/Habitify/Strides feature sets and Duolingo retention mechanics:
   "coming" chips — moat marketing on the landing's "whole arsenal" grid.
 - **Brand**: "1% a day is the floor, not the ceiling" — landing + analytics compounding panel.
 
+## 8e · Framework v2 pass (added 2026-07-10, founder framework amendment — see QUESTION_FRAMEWORK.md §12)
+
+The daily review moved from one-question-per-view to **section screens** (7 Student + 7 Teacher):
+
+- **Section screen anatomy** (top to bottom): section eyebrow (mono, accent) → the *thinking goal* as the display-size statement (the section's one question, replacing the old per-question h2) → purpose line (muted) → required anchors (shaped controls, prompt at 1.0625rem medium — deliberately smaller than the goal so the hierarchy reads section > anchor) → trigger cluster ("think through — answer any, all, or none", em-dash list, muted) → benchmark reveal → unlimited prose field → optional cause chips → custom questions (Handoff/Final Verdict only, "your question" eyebrow).
+- **Anchors alone gate `Next`**; the prose note under the field says so ("no limit — the depth is yours. anchors alone are required."). The candor crumb now sums a section's anchor pays.
+- **Benchmark reveal**: `see the benchmark` — mono dotted-underline trigger, expands an italic muted quote with a 2px accent left rule; height+opacity 220ms on the standard curve, static swap under reduced motion. One per section plus per-anchor where an example exists.
+- **Execution Rating (TR)**: reuses the 0–10 scale control with relabeled poles ("below standard / at your standard") + a required why-textarea — the wager's scale labels are untouched so the two instruments never read as one.
+- **T1 audit binary**: a second yes/no pair ("It holds / It would not") revealed after the verdict enum, `rise` entrance like the S1 evidence field.
+- **Arm screen**: minute estimates deleted (depth philosophy); "Full audit — as deep as you're willing to go — effort in, insight out" vs "Minimum day — the minimum honest record — beats no record"; founder's principle line added under the h1. MVD keeps the old per-question flow (5 anchors) — the minimum stays minimal.
+- **Question editor** (`/areas`, per-card expand): The Law panel (accent-tinted card, 6 rules), accordion per section with override fields (default shown as placeholder = free per-field reset), per-anchor prompt/hint/example fields ("answer type locked" eyebrow), soft-lint warnings in gold ("⚠ … — saved anyway; the call is yours."), custom-question builder (mode chips, shape chips, ≤2).
+- **Sealed dossier** grew: section prose rows (labeled by section name), cause rows, custom answers; `max-h-[70vh] overflow-y-auto` so deep records don't push the Teacher's controls off-screen; empty state: "A thin record. Judge what is written — nothing else exists."
+
+## 8f · Vault Seal v2 (added 2026-07-10, founder ruling — the cinematic Mode Shift)
+
+The §3 seal was rebuilt as forced theatre (~6.5s, founder ruling: **no skip** — "after writing that much
+in Student mode it acts like a small rest / mentally preparing for Teacher mode"; plays in full every day;
+MVD gets a ~1.7s compressed cut per framework §5).
+
+Timeline: sealed letter rises (envelope + accent wax + mono SEALED stamp, 0–1.1s) → slides into the open
+vault's dark interior (1.1–1.9s) → door slams (0.12s) with decaying scene shake ±6px and an impact-flash
+ring (1.9–2.4s) → wheel ballet: main five-spoke wheel spins ~1260° with ratchet hesitations (keyframed
+rotate array), two aux wheels counter-spin −1800° (2.4–4.6s) → eight bolts extend + clunk snap-back
+(spring, stiffness 650) with a second subtler shake (4.6–5.1s) → **VAULTED** badge slams in (scale 2.8→1,
+y −160→0, overshoot ease `[0.2,0.9,0.3,1.4]`) → the ritual line → the **blood gate** (5.9s).
+
+**The blood gate is the temperature inversion.** The screen stays Student-emerald through the whole
+cinematic (the old 600ms auto `setMode` is gone). A blood button ("Enter Teacher Mode") uses a LOCAL
+palette — `#a11220 / #6f0a12 / #43060b` — because `--accent` is still emerald at that moment; gold stays
+money-only; no conflict with the destructive token `#FF4D42` (no destructive action exists on this
+screen). On click: button swells → six uneven drips elongate beneath it (staggered, 0.6s) → a two-layer
+blood flood expands from the button's measured center (`clip-path: circle(0%→150%)`, 0.75–0.85s) →
+`setMode("teacher")` fires under full cover → the whole overlay exit-crossfades (0.45s, AnimatePresence
+in review/page.tsx) revealing the already-red Teacher room.
+
+Reduced motion (accessibility law, not a skip): static locked vault + VAULTED badge + line + blood
+button; click switches instantly — no shake, no drips, no flood. The landing page keeps the old compact
+static vault glyph (`Vault` export). All trig coordinates remain `.toFixed(3)`-rounded (hydration).
+
+## 8g · Vault v3 + the red-guidance pass (added 2026-07-10, founder feedback: "the look is horrible… like a cartoon")
+
+**Vault v3 — machined steel, same choreography.** The v2 line-art scene was rebuilt as a shaded metal
+composition (all SVG, no assets; 21st.dev searched — no vault exists in its catalog): dark radial-spotlight
+stage + vignette; brushed wall plate (feTurbulence streak filter at 5% alpha) with corner bolts; left hinge
+column with three knuckles; bezel of stacked gradient-stroke rings; radial-steel door face; 16-rivet ring
+(each rivet carries an off-center specular dot); etched recess rings; **piston bolts** — eight gradient
+capsules that slide out from under the disk into the frame gap on lock (replacing v2's line-bolts); wheel
+as torus (double gradient stroke + dash-glint) with capsule spokes, end knobs and a domed highlight hub;
+two etched tick-mark dials; floor horizon + shadow ellipse + warm light puddle (the interior glow and
+puddle use a warm-neutral `#e8dcc4` — deliberately NOT the gold token; gold stays money-only). The letter
+is now premium stationery: cream paper gradient, flap shadow, red wax seal with highlight, rotated
+stencil "TOP SECRET" over the mono SEALED stamp; the interior glow brightens as it enters. Scene scaled to
+`min(88vw, 480px)` (v2's 230px miniature was half the cartoon problem). Slam adds a 6-particle dust burst.
+The planned mirrored floor reflection was implemented as the shadow+puddle treatment instead (a full
+mirrored motion-tree doubles animation cost on mobile for marginal gain — noted deviation).
+**The compressed MVD cut is deleted** — `FULL_TIMELINE` is the only timeline (framework §12.9.3).
+
+**Red guidance (the explained-blocked pattern).** Advance buttons are never silently disabled: a blocked
+click shakes the button, prints a signal-red (`#FF4D42`, never teacher ember — §9.4) requirement line
+under each unmet field ("Write it — or write “none”. Blanks don't exist in the record."), a red summary
+line under the controls, and scrolls to the first gap. Red lines appear only after an attempt. The S2
+list input commits its typed draft on blur (typed text can't be lost) and shows a helper line while a
+draft is pending; its counter reads "n/5 logged". Explicit-none answers render in the dossier as muted
+text with a "· none — tracked" marker; `/analytics` gains the 30-day "none answers" stat tile.
+
+## 8h · The Vault Room (added 2026-07-10, founder feature — QUESTION_FRAMEWORK §12.10)
+
+`/vault` (nav slot between Areas and History): the v3 metal vault, live. Reuses `MetalDefs`/`pt`/
+`EtchedDial` exported from mode-shift.tsx; the door composition is re-instanced with a **drag-driven
+wheel** (framer pan → MotionValue rotation).
+
+- **Idle deny**: rubber-band resistance (`22°·tanh(drag/60)`), spring snap-back, scene shudder, and a
+  signal-red "DENIED" stamp (error semantics — never blood/ember).
+- **Skill crack**: 20s clock in the HUD; three sweet spots; a marker triangle above the wheel burns
+  brighter with proximity (mythic hot-gold for skill, gold for the combination dial); a 400ms steady hold
+  catches — piston bolts retract in groups of ~3 per catch; three catches swing the door.
+- **Combination dial**: digits displayed (earned, not secret) as gold pips; the dialing is ceremony.
+- **Loot reveal**: full-screen card; border + inner/outer glow in the rarity color, glow radius scales at
+  legendary/mythic. **Rarity palette is loot-only** (never UI semantics): grey `#9aa3ad`, green `#57c256`,
+  blue `#3aa1ff`, purple `#b350f2`, legendary `var(--gold)` (loot is economy — gold is legal), mythic
+  `#ffd76a`. bp lands via `CountUp` in gold.
+- **The Archive**: cream TOP-SECRET dossier cards (v3 letter stationery as UI), stacked, expandable;
+  a paper stack renders inside the open door's interior glow. Same records as History — different room.
+- **Teasers/integrations**: `/today` card with three digit pips + banked attempts + streak; Settings
+  accent picker gains vault exclusives (rarity-colored borders, "crack the vault" when unowned) + the
+  Signet input; the area editor's custom-question cap reads 2+1 with The Third Question.
+
 ## 9 · Audit results (run against the built prototype, all screens screenshotted)
 
 | # | Test | Result | Evidence |

@@ -1,17 +1,27 @@
 "use client";
 
-// The Daily Review: guided flow, one question per view, input matched to the
-// answer shape, Student → Mode Shift → Teacher → commitment. Consumes
-// QUESTION_FRAMEWORK.md via src/lib/framework.ts.
+// The Daily Review, Framework v2: a guided self-performance audit.
+// Full path = section screens (thinking triggers + free-depth prose + shaped
+// anchors; anchors alone gate). Minimum day = the anchor-only per-question
+// flow. Student → Seal → Mode Shift → Teacher → one order on the desk.
+// Consumes QUESTION_FRAMEWORK.md §12 via src/lib/framework.ts.
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePrefersReduced } from "@/lib/use-reduced";
-import { QUESTIONS, REVERSE_SHIFT_LINE, studentSteps, teacherSteps } from "@/lib/framework";
-import type { AnswerValue, MissionOutcome, Question, ResolveResult } from "@/lib/types";
+import {
+  customsFor,
+  effectiveQuestion,
+  effectiveSection,
+  mvdStudentSteps,
+  mvdTeacherSteps,
+  REVERSE_SHIFT_LINE,
+  sectionsFor,
+} from "@/lib/framework";
+import type { Area, AnswerValue, MissionOutcome, Question, ResolveResult, Section } from "@/lib/types";
 import { useApp, useEconomy, useHardLine, useYesterdayMission } from "@/lib/store";
-import { candorForQuestion, chainFrom, drawSeal, momentumFromChain, resolveWager } from "@/lib/economy";
+import { candorForQuestion, chainFrom, drawSeal, isNoneText, momentumFromChain, resolveWager } from "@/lib/economy";
 import { dayOffset } from "@/lib/mock";
 import { isAnswered, ShapeInput } from "@/components/inputs";
 import { ModeShift } from "@/components/mode-shift";
@@ -21,6 +31,40 @@ import Link from "next/link";
 import { Button, Card, Chip, CompoundRule, Label, ProgressSegments } from "@/components/ui";
 
 type Phase = "arm" | "student" | "shift" | "teacher" | "commit";
+
+const proseCls =
+  "w-full rounded-[var(--radius-sm)] border border-line bg-surface-2 px-3 py-2.5 text-[0.9375rem] text-ink outline-none placeholder:text-muted/50 focus:border-accent min-h-24 resize-none";
+
+// Error semantics use signal red — never the teacher ember (§9.4 separation).
+const ERR_RED = "#FF4D42";
+
+/** What the red line says when an anchor is unmet. */
+const ANCHOR_MSGS: Record<string, string> = {
+  S1: "Yes or no — then the proof an outsider would accept.",
+  S2: "Log at least one completed thing — “none” is legal.",
+  S3: "Enter today's numbers.",
+  S4: "Name the avoidance — or write “none”.",
+  S5: "State the condition and its effect.",
+  ST1: "Reconstruct the timeline — facts only.",
+  T1: "Rule on it — verdict, then the audit call.",
+  T2: "Point at a line in the record — or write “none”.",
+  T3: "Name the weakness and tag its recurrence.",
+  T4: "When, where, what — all three.",
+  T5: "Place the stake.",
+  T6: "Name the break point: “If X, then Y.”",
+  TR: "Pick the number and write the why — it's worthless without it.",
+};
+const PROSE_MSG = "Write it — or write “none”. Blanks don't exist in the record.";
+
+/** The red requirement line, shown only after a blocked attempt. */
+function ReqLine({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return (
+    <p className="mt-1.5 text-[0.75rem] font-medium" style={{ color: ERR_RED }} role="alert">
+      {msg}
+    </p>
+  );
+}
 
 export default function ReviewPage() {
   const router = useRouter();
@@ -47,6 +91,9 @@ export default function ReviewPage() {
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [idx, setIdx] = useState(0);
   const [dir, setDir] = useState(1);
+  // Blocked-attempt state: red guidance appears only after the user tries.
+  const [attempted, setAttempted] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
   const [resolveResult, setResolveResult] = useState<ResolveResult | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [crumb, setCrumb] = useState<{ bp: number; key: number } | null>(null);
@@ -61,10 +108,30 @@ export default function ReviewPage() {
   const s1 = answers.S1;
   const s1No = s1?.kind === "binary" && s1.value === false;
 
-  const sSteps = useMemo(() => studentSteps({ hasMission, s1No, mvd }), [hasMission, s1No, mvd]);
-  const tSteps = useMemo(() => teacherSteps({ hasMission, mvd }), [hasMission, mvd]);
-  const steps = phase === "teacher" ? tSteps : sSteps;
   const area = areas.find((a) => a.id === areaId) ?? areas[0];
+
+  // Full path: section screens. Minimum day: anchor-only steps.
+  const sections = useMemo(
+    () => sectionsFor(phase === "teacher" ? "teacher" : "student").map((s) => effectiveSection(s, area)),
+    [phase, area]
+  );
+  const mvdSteps = useMemo(
+    () => (phase === "teacher" ? mvdTeacherSteps(hasMission) : mvdStudentSteps(hasMission)),
+    [phase, hasMission]
+  );
+  const total = mvd ? mvdSteps.length : sections.length;
+
+  /** A section's live anchors: S1 needs a standing mission, S3 needs metrics,
+   *  ST1 fires inside Intentions vs Reality when S1 = no. */
+  const anchorsOf = (sec: Section): string[] => {
+    let ids = sec.anchors.filter((id) => {
+      if (id === "S1") return hasMission;
+      if (id === "S3") return (area?.metrics.length ?? 0) > 0;
+      return true;
+    });
+    if (sec.id === "sec-s2" && hasMission && s1No) ids = [...ids, "ST1"];
+    return ids;
+  };
 
   const prevS3 = useMemo(() => {
     const recs = records.filter((r) => r.areaId === areaId && r.answers.S3?.kind === "count");
@@ -82,28 +149,68 @@ export default function ReviewPage() {
     if (mode !== "student") setMode("student", false);
   };
 
-  const currentId = steps[idx];
-  const question: Question | undefined = currentId ? QUESTIONS[currentId] : undefined;
+  const section: Section | undefined = !mvd ? sections[idx] : undefined;
+  const mvdId = mvd ? mvdSteps[idx] : undefined;
   // MVD renders S2 as its one-line variant (framework §5, S2-lite).
-  const effective: Question | undefined =
-    question && mvd && question.id === "S2"
-      ? { ...question, prompt: "One completed thing today.", hint: "“Nothing” is a legal, recorded answer.", shape: { kind: "line" } }
-      : question;
+  const mvdQuestion: Question | undefined = (() => {
+    if (!mvdId) return undefined;
+    const q = effectiveQuestion(mvdId, area);
+    if (q && mvdId === "S2")
+      return { ...q, prompt: "One completed thing today.", hint: "“Nothing” is a legal, recorded answer.", shape: { kind: "line" } };
+    return q;
+  })();
 
-  const canNext = effective ? isAnswered(effective.shape, answers[effective.id]) : false;
+  // Requirements: anchors + section prose + custom questions. Nothing stays
+  // blank — an explicit "none" is the legal skip, and none-moments are tracked.
+  const gateIds = mvd ? (mvdQuestion ? [mvdQuestion.id] : []) : section ? anchorsOf(section) : [];
+  const textOk = (id: string) => {
+    const v = answers[id];
+    return (v?.kind === "text" || v?.kind === "line") && v.value.trim().length > 0;
+  };
+  const requirements: { id: string; msg: string }[] = [];
+  if (mvd && mvdQuestion) {
+    if (!isAnswered(mvdQuestion.shape, answers[mvdQuestion.id]))
+      requirements.push({ id: mvdQuestion.id, msg: ANCHOR_MSGS[mvdQuestion.id] ?? "Required — the record can't seal without it." });
+  } else if (section) {
+    for (const id of gateIds) {
+      const q = effectiveQuestion(id, area);
+      if (q && !isAnswered(q.shape, answers[id]))
+        requirements.push({ id, msg: ANCHOR_MSGS[id] ?? "Required — the record can't seal without it." });
+    }
+    if (!textOk(section.proseId)) requirements.push({ id: section.proseId, msg: PROSE_MSG });
+    const secCustoms =
+      section.id === "sec-s7" || section.id === "sec-t6" ? customsFor(area, phase === "teacher" ? "teacher" : "student") : [];
+    for (const c of secCustoms) {
+      if (!textOk(c.id)) requirements.push({ id: c.id, msg: PROSE_MSG });
+    }
+  }
+  const errors: Record<string, string> = attempted
+    ? Object.fromEntries(requirements.map((r) => [r.id, r.msg]))
+    : {};
 
   const next = () => {
+    // Blocked: show the red guidance, shake, and take them to the first gap.
+    if (requirements.length > 0) {
+      setAttempted(true);
+      setShakeKey((k) => k + 1);
+      const first = requirements[0];
+      document
+        .querySelector(`[data-req-id="${first.id}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setAttempted(false);
     setDir(1);
 
-    // Micro-pay: the question's candor crumb pulses as the Student advances.
+    // Micro-pay: candor crumbs pulse as the Student advances — anchors only.
     // Visible money, not new money — crumbs sum into the sealed total.
-    if (phase === "student" && effective) {
-      const bp = candorForQuestion(effective.id, answers, mvd ? "mvd" : "full");
+    if (phase === "student") {
+      const bp = gateIds.reduce((s, id) => s + candorForQuestion(id, answers, mvd ? "mvd" : "full"), 0);
       if (bp > 0) setCrumb({ bp, key: Date.now() });
     }
 
     // T1 answered: the bet resolves — the Teacher is the payer.
-    if (phase === "teacher" && currentId === "T1" && standing) {
+    if (phase === "teacher" && gateIds.includes("T1") && standing) {
       const t1 = answers.T1;
       if (t1?.kind === "enum") {
         const res = resolveWager(
@@ -117,8 +224,9 @@ export default function ReviewPage() {
       }
     }
 
-    if (idx < steps.length - 1) {
+    if (idx < total - 1) {
       setIdx(idx + 1);
+      setAttempted(false);
       return;
     }
     if (phase === "student") {
@@ -131,9 +239,18 @@ export default function ReviewPage() {
 
   const back = () => {
     if (idx === 0) return;
+    setAttempted(false);
     setDir(-1);
     setIdx(idx - 1);
   };
+
+  const setAnswer = (id: string, v: AnswerValue) => setAnswers((a) => ({ ...a, [id]: v }));
+  const clearAnswer = (id: string) =>
+    setAnswers((a) => {
+      const nextA = { ...a };
+      delete nextA[id];
+      return nextA;
+    });
 
   if (todayDone && phase === "arm") {
     return (
@@ -156,6 +273,9 @@ export default function ReviewPage() {
         <div className="mx-auto max-w-md">
           <Label>Daily review</Label>
           <h1 className="type-display mt-2 text-[1.75rem]">Arm the loop.</h1>
+          <p className="mt-2 text-[0.8125rem] text-muted">
+            The more seriously you analyse yourself, the more valuable the outcome becomes.
+          </p>
           {prefs.hardLines && (
             <p className="type-display mt-3 text-[1.125rem] italic leading-snug text-ink/90">
               &ldquo;{armLine}&rdquo;
@@ -196,8 +316,10 @@ export default function ReviewPage() {
                     !mvd ? "border-accent bg-accent/10 text-ink" : "border-line bg-surface-2 text-muted"
                   }`}
                 >
-                  Full review
-                  <span className="type-mono block text-[0.6875rem] text-muted">~7 min</span>
+                  Full audit
+                  <span className="type-mono block text-[0.6875rem] text-muted">
+                    as deep as you&apos;re willing to go — effort in, insight out
+                  </span>
                 </button>
                 <button
                   onClick={() => setMvd(true)}
@@ -206,7 +328,9 @@ export default function ReviewPage() {
                   }`}
                 >
                   Minimum day
-                  <span className="type-mono block text-[0.6875rem] text-muted">~3 min · thin record beats no record</span>
+                  <span className="type-mono block text-[0.6875rem] text-muted">
+                    the minimum honest record — beats no record
+                  </span>
                 </button>
               </div>
             </div>
@@ -217,7 +341,7 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {(phase === "student" || phase === "teacher") && effective && (
+      {(phase === "student" || phase === "teacher") && (
         <div className={`mx-auto ${phase === "teacher" ? "max-w-xl lg:max-w-5xl" : "max-w-xl"}`}>
           <div className="mb-6 flex items-center justify-between gap-4">
             <Label>
@@ -227,7 +351,10 @@ export default function ReviewPage() {
               exit — draft is kept
             </button>
           </div>
-          <ProgressSegments ids={steps} current={idx} />
+          <ProgressSegments
+            ids={mvd ? mvdSteps : sections.map((_, i) => `${i + 1}`)}
+            current={idx}
+          />
 
           <div
             className={
@@ -238,108 +365,102 @@ export default function ReviewPage() {
           >
             {phase === "teacher" && (
               <div className="lg:sticky lg:top-6">
-                <SealedRecord answers={answers} mvd={mvd} />
+                <SealedRecord answers={answers} area={area} mvd={mvd} />
               </div>
             )}
 
             <div>
-          <AnimatePresence mode="wait" custom={dir}>
-            <motion.div
-              key={effective.id}
-              custom={dir}
-              initial={reduced ? { opacity: 0 } : { opacity: 0, x: 28 * dir }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={reduced ? { opacity: 0 } : { opacity: 0, x: -28 * dir }}
-              transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
-              className="mt-8"
-            >
-              <div className="flex items-center gap-3">
-                <span className="type-mono text-[0.6875rem] text-accent">{effective.id}</span>
-                {effective.id === "T5" && (
-                  <span className="type-mono rounded-[3px] border border-accent/60 px-1.5 py-0.5 text-[0.5625rem] uppercase tracking-[0.25em] text-accent">
-                    the wager
+              <AnimatePresence mode="wait" custom={dir}>
+                <motion.div
+                  key={mvd ? mvdId : section?.id}
+                  custom={dir}
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, x: 28 * dir }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={reduced ? { opacity: 0 } : { opacity: 0, x: -28 * dir }}
+                  transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+                  className="mt-8"
+                >
+                  {mvd && mvdQuestion && (
+                    <MvdStep
+                      question={mvdQuestion}
+                      answers={answers}
+                      setAnswer={setAnswer}
+                      area={area}
+                      prevS3={prevS3}
+                      focusLogs={focusLogs}
+                      reduced={reduced}
+                      errors={errors}
+                    />
+                  )}
+
+                  {!mvd && section && (
+                    <SectionScreen
+                      section={section}
+                      anchors={anchorsOf(section)}
+                      answers={answers}
+                      setAnswer={setAnswer}
+                      clearAnswer={clearAnswer}
+                      area={area}
+                      prevS3={prevS3}
+                      focusLogs={focusLogs}
+                      reduced={reduced}
+                      phase={phase}
+                      errors={errors}
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+
+              <div className="relative mt-10 flex items-center justify-between gap-3">
+                <Button variant="ghost" onClick={back} disabled={idx === 0} className="min-w-24">
+                  Back
+                </Button>
+                {crumb && (
+                  <span
+                    key={crumb.key}
+                    className="crumb type-mono pointer-events-none absolute -top-6 right-2 text-[0.8125rem]"
+                    style={{ color: "var(--gold)" }}
+                    aria-hidden
+                  >
+                    +{crumb.bp} bp
                   </span>
                 )}
+                {/* Always clickable: a blocked click explains itself in red. */}
+                <motion.div
+                  key={shakeKey}
+                  animate={shakeKey > 0 && !reduced ? { x: [0, -7, 6, -4, 3, 0] } : { x: 0 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                >
+                  <Button onClick={next} className="min-w-44">
+                    {phase === "student" && idx === total - 1
+                      ? "Seal the record"
+                      : phase === "teacher" && idx === total - 1
+                        ? "Commit mission"
+                        : "Next"}
+                  </Button>
+                </motion.div>
               </div>
-              <h2 className="type-display mt-2 text-[1.45rem] leading-snug md:text-[1.75rem]">
-                {effective.prompt}
-              </h2>
-              {effective.hint && <p className="mt-2 text-[0.8125rem] text-muted">{effective.hint}</p>}
-              <div className="mt-6">
-                <ShapeInput
-                  shape={effective.shape}
-                  value={answers[effective.id]}
-                  onChange={(v) => setAnswers((a) => ({ ...a, [effective.id]: v }))}
-                  metrics={area.metrics}
-                  prevValues={prevS3}
-                />
-              </div>
-              {effective.id === "T5" && (
-                <p className="type-mono mt-3 text-[0.6875rem] text-muted">
-                  this call is your stake — it resolves at tomorrow&apos;s verdict. honest is the best play.
+              {attempted && requirements.length > 0 && (
+                <p className="mt-3 text-right text-[0.75rem]" style={{ color: ERR_RED }}>
+                  {`${requirements.length} ${requirements.length === 1 ? "thing" : "things"} missing — nothing stays blank. Write it, or write "none".`}
                 </p>
               )}
-              {effective.id === "S1" && focusLogs.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {focusLogs.slice(-3).map((log, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() =>
-                        setAnswers((a) => {
-                          const s1 = a.S1;
-                          if (s1?.kind !== "binary") return a;
-                          return {
-                            ...a,
-                            S1: { ...s1, evidence: `focus session · ${log.minutes} min · logged in app` },
-                          };
-                        })
-                      }
-                      className="type-mono rounded-full border px-3 py-1 text-[0.6875rem]"
-                      style={{ borderColor: "var(--gold)", color: "var(--gold)" }}
-                    >
-                      use: focus session · {log.minutes} min
-                    </button>
-                  ))}
-                </div>
+              {phase === "teacher" && (
+                <p className="type-mono mt-4 text-center text-[0.6875rem] text-muted/70">
+                  the record is sealed — evaluation only
+                </p>
               )}
-              {effective.id === "T3" && <CoachChips answers={answers} setAnswers={setAnswers} />}
-            </motion.div>
-          </AnimatePresence>
-
-          <div className="relative mt-10 flex items-center justify-between gap-3">
-            <Button variant="ghost" onClick={back} disabled={idx === 0} className="min-w-24">
-              Back
-            </Button>
-            {crumb && (
-              <span
-                key={crumb.key}
-                className="crumb type-mono pointer-events-none absolute -top-6 right-2 text-[0.8125rem]"
-                style={{ color: "var(--gold)" }}
-                aria-hidden
-              >
-                +{crumb.bp} bp
-              </span>
-            )}
-            <Button onClick={next} disabled={!canNext} className="min-w-44">
-              {phase === "student" && idx === steps.length - 1
-                ? "Seal the record"
-                : phase === "teacher" && idx === steps.length - 1
-                  ? "Commit mission"
-                  : "Next"}
-            </Button>
-          </div>
-          {phase === "teacher" && (
-            <p className="type-mono mt-4 text-center text-[0.6875rem] text-muted/70">
-              the record is sealed — evaluation only
-            </p>
-          )}
             </div>
           </div>
         </div>
       )}
 
-      {phase === "shift" && <ModeShift onDone={() => { setIdx(0); setPhase("teacher"); }} />}
+      {/* The blood-covered overlay crossfades out over the already-red Teacher room. */}
+      <AnimatePresence>
+        {phase === "shift" && (
+          <ModeShift key="shift" onDone={() => { setIdx(0); setPhase("teacher"); }} />
+        )}
+      </AnimatePresence>
 
       {resolveOpen && resolveResult && (
         <ResolveCard
@@ -371,6 +492,349 @@ export default function ReviewPage() {
   );
 }
 
+// ---- The section screen: triggers think, prose records, anchors gate ----
+
+function SectionScreen({
+  section,
+  anchors,
+  answers,
+  setAnswer,
+  clearAnswer,
+  area,
+  prevS3,
+  focusLogs,
+  reduced,
+  phase,
+  errors,
+}: {
+  section: Section;
+  anchors: string[];
+  answers: Record<string, AnswerValue>;
+  setAnswer: (id: string, v: AnswerValue) => void;
+  clearAnswer: (id: string) => void;
+  area: Area;
+  prevS3?: Record<string, number>;
+  focusLogs: { minutes: number }[];
+  reduced: boolean;
+  phase: "student" | "teacher";
+  errors: Record<string, string>;
+}) {
+  const prose = answers[section.proseId];
+  const proseValue = prose?.kind === "text" ? prose.value : "";
+  // The user's own questions live in Handoff (student) / Final Verdict (teacher).
+  const customs =
+    section.id === "sec-s7" || section.id === "sec-t6" ? customsFor(area, phase) : [];
+
+  return (
+    <div>
+      <span className="type-mono text-[0.6875rem] text-accent">{section.name}</span>
+      <h2 className="type-display mt-2 text-[1.45rem] leading-snug md:text-[1.75rem]">
+        {section.goal}
+      </h2>
+      <p className="mt-2 text-[0.8125rem] text-muted">{section.purpose}</p>
+
+      {/* Anchors first: the required spine of the record. */}
+      {anchors.map((id) => (
+        <AnchorBlock
+          key={id}
+          id={id}
+          answers={answers}
+          setAnswer={setAnswer}
+          area={area}
+          prevS3={prevS3}
+          focusLogs={focusLogs}
+          reduced={reduced}
+          error={errors[id]}
+        />
+      ))}
+
+      {/* The thinking triggers: prompts, not fields. */}
+      <div className="mt-7">
+        <p className="type-mono text-[0.625rem] uppercase tracking-[0.2em] text-muted">
+          think through — answer any, all, or none
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {section.triggers.map((t) => (
+            <li key={t} className="flex gap-2 text-[0.8125rem] leading-snug text-muted">
+              <span className="text-accent/70">—</span>
+              <span>{t}</span>
+            </li>
+          ))}
+        </ul>
+        <Benchmark text={section.example} reduced={reduced} />
+      </div>
+
+      <div className="mt-4" data-req-id={section.proseId}>
+        <textarea
+          className={proseCls}
+          value={proseValue}
+          onChange={(e) => setAnswer(section.proseId, { kind: "text", value: e.target.value })}
+          placeholder={section.placeholder}
+          rows={3}
+        />
+        <p className="type-mono mt-1 text-[0.625rem] text-muted/70">
+          no limit — say all of it. nothing stays blank: write it, or write &ldquo;none&rdquo;.
+        </p>
+        <ReqLine msg={errors[section.proseId]} />
+      </div>
+
+      {section.cause && (
+        <CausePicker
+          cause={section.cause}
+          value={answers[section.cause.id]}
+          setAnswer={setAnswer}
+          clearAnswer={clearAnswer}
+        />
+      )}
+
+      {customs.map((c) => {
+        const q = effectiveQuestion(c.id, area);
+        if (!q) return null;
+        return (
+          <div key={c.id} className="mt-7 border-t border-line pt-5" data-req-id={c.id}>
+            <div className="flex items-center gap-2">
+              <span className="type-mono text-[0.625rem] uppercase tracking-[0.2em] text-muted">
+                your question
+              </span>
+            </div>
+            <p className="mt-1.5 text-[1rem] font-medium text-ink">{q.prompt}</p>
+            {q.hint && <p className="mt-1 text-[0.8125rem] text-muted">{q.hint}</p>}
+            <Benchmark text={q.example} reduced={reduced} />
+            <div className="mt-3">
+              <ShapeInput
+                shape={q.shape}
+                value={answers[c.id]}
+                onChange={(v) => setAnswer(c.id, v)}
+              />
+            </div>
+            <ReqLine msg={errors[c.id]} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** One required anchor inside a section: prompt, hint, shaped input, chrome. */
+function AnchorBlock({
+  id,
+  answers,
+  setAnswer,
+  area,
+  prevS3,
+  focusLogs,
+  reduced,
+  error,
+}: {
+  id: string;
+  answers: Record<string, AnswerValue>;
+  setAnswer: (id: string, v: AnswerValue) => void;
+  area: Area;
+  prevS3?: Record<string, number>;
+  focusLogs: { minutes: number }[];
+  reduced: boolean;
+  error?: string;
+}) {
+  const q = effectiveQuestion(id, area);
+  if (!q) return null;
+  return (
+    <div className="mt-7" data-req-id={id}>
+      <div className="flex items-center gap-3">
+        <span className="type-mono text-[0.6875rem] text-accent">{q.id}</span>
+        {q.id === "T5" && (
+          <span className="type-mono rounded-[3px] border border-accent/60 px-1.5 py-0.5 text-[0.5625rem] uppercase tracking-[0.25em] text-accent">
+            the wager
+          </span>
+        )}
+        {q.id === "TR" && (
+          <span className="type-mono rounded-[3px] border border-accent/60 px-1.5 py-0.5 text-[0.5625rem] uppercase tracking-[0.25em] text-accent">
+            execution rating
+          </span>
+        )}
+      </div>
+      <p className="mt-1.5 text-[1.0625rem] font-medium leading-snug text-ink">{q.prompt}</p>
+      {q.hint && <p className="mt-1 text-[0.8125rem] text-muted">{q.hint}</p>}
+      <Benchmark text={q.example} reduced={reduced} />
+      <div className="mt-3">
+        <ShapeInput
+          shape={q.shape}
+          value={answers[q.id]}
+          onChange={(v) => setAnswer(q.id, v)}
+          metrics={area.metrics}
+          prevValues={prevS3}
+        />
+      </div>
+      <ReqLine msg={error} />
+      {q.id === "T5" && (
+        <p className="type-mono mt-3 text-[0.6875rem] text-muted">
+          this call is your stake — it resolves at tomorrow&apos;s verdict. honest is the best play.
+        </p>
+      )}
+      {q.id === "S1" && <FocusEvidenceChips answers={answers} setAnswer={setAnswer} focusLogs={focusLogs} />}
+      {q.id === "T3" && <CoachChips answers={answers} setAnswer={setAnswer} />}
+    </div>
+  );
+}
+
+/** Minimum day: the old one-question-per-view flow, anchors only. */
+function MvdStep({
+  question,
+  answers,
+  setAnswer,
+  area,
+  prevS3,
+  focusLogs,
+  reduced,
+  errors,
+}: {
+  question: Question;
+  answers: Record<string, AnswerValue>;
+  setAnswer: (id: string, v: AnswerValue) => void;
+  area: Area;
+  prevS3?: Record<string, number>;
+  focusLogs: { minutes: number }[];
+  reduced: boolean;
+  errors: Record<string, string>;
+}) {
+  return (
+    <div data-req-id={question.id}>
+      <div className="flex items-center gap-3">
+        <span className="type-mono text-[0.6875rem] text-accent">{question.id}</span>
+        {question.id === "T5" && (
+          <span className="type-mono rounded-[3px] border border-accent/60 px-1.5 py-0.5 text-[0.5625rem] uppercase tracking-[0.25em] text-accent">
+            the wager
+          </span>
+        )}
+      </div>
+      <h2 className="type-display mt-2 text-[1.45rem] leading-snug md:text-[1.75rem]">
+        {question.prompt}
+      </h2>
+      {question.hint && <p className="mt-2 text-[0.8125rem] text-muted">{question.hint}</p>}
+      <Benchmark text={question.example} reduced={reduced} />
+      <div className="mt-6">
+        <ShapeInput
+          shape={question.shape}
+          value={answers[question.id]}
+          onChange={(v) => setAnswer(question.id, v)}
+          metrics={area.metrics}
+          prevValues={prevS3}
+        />
+      </div>
+      <ReqLine msg={errors[question.id]} />
+      {question.id === "T5" && (
+        <p className="type-mono mt-3 text-[0.6875rem] text-muted">
+          this call is your stake — it resolves at tomorrow&apos;s verdict. honest is the best play.
+        </p>
+      )}
+      {question.id === "S1" && <FocusEvidenceChips answers={answers} setAnswer={setAnswer} focusLogs={focusLogs} />}
+    </div>
+  );
+}
+
+/** Founder-authored benchmark answer, tap-to-reveal. Static under reduced motion. */
+function Benchmark({ text, reduced }: { text?: string; reduced: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="type-mono text-[0.6875rem] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+        aria-expanded={open}
+      >
+        {open ? "hide the benchmark" : "see the benchmark"}
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={reduced ? { opacity: 1 } : { height: 0, opacity: 0 }}
+            animate={reduced ? { opacity: 1 } : { height: "auto", opacity: 1 }}
+            exit={reduced ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+            className="overflow-hidden"
+          >
+            <p className="mt-2 border-l-2 border-accent/40 pl-3 text-[0.8125rem] italic leading-relaxed text-muted">
+              e.g. — {text}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Optional one-tap cause. Tapping the selected chip clears it — never gates. */
+function CausePicker({
+  cause,
+  value,
+  setAnswer,
+  clearAnswer,
+}: {
+  cause: NonNullable<Section["cause"]>;
+  value: AnswerValue | undefined;
+  setAnswer: (id: string, v: AnswerValue) => void;
+  clearAnswer: (id: string) => void;
+}) {
+  const selected = value?.kind === "enum" ? value.value : undefined;
+  return (
+    <div className="mt-5">
+      <p className="type-mono text-[0.625rem] uppercase tracking-[0.2em] text-muted">
+        {cause.prompt} <span className="normal-case tracking-normal">(optional)</span>
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {cause.options.map((o) => (
+          <button
+            key={o}
+            type="button"
+            onClick={() =>
+              selected === o ? clearAnswer(cause.id) : setAnswer(cause.id, { kind: "enum", value: o })
+            }
+            className={`rounded-full border px-3 py-1 text-[0.75rem] capitalize transition-colors duration-[var(--dur-fast)] ${
+              selected === o
+                ? "border-accent bg-accent/10 text-ink"
+                : "border-line text-muted hover:border-muted hover:text-ink"
+            }`}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FocusEvidenceChips({
+  answers,
+  setAnswer,
+  focusLogs,
+}: {
+  answers: Record<string, AnswerValue>;
+  setAnswer: (id: string, v: AnswerValue) => void;
+  focusLogs: { minutes: number }[];
+}) {
+  if (focusLogs.length === 0) return null;
+  const s1 = answers.S1;
+  if (s1?.kind !== "binary") return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {focusLogs.slice(-3).map((log, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() =>
+            setAnswer("S1", { ...s1, evidence: `focus session · ${log.minutes} min · logged in app` })
+          }
+          className="type-mono rounded-full border px-3 py-1 text-[0.6875rem]"
+          style={{ borderColor: "var(--gold)", color: "var(--gold)" }}
+        >
+          use: focus session · {log.minutes} min
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Coach · beta — deterministic rules over the record, no API. */
 function CoachBrief({ areaId }: { areaId: string }) {
   const { missions, areas } = useApp();
@@ -387,10 +851,10 @@ function CoachBrief({ areaId }: { areaId: string }) {
 
 function CoachChips({
   answers,
-  setAnswers,
+  setAnswer,
 }: {
   answers: Record<string, AnswerValue>;
-  setAnswers: React.Dispatch<React.SetStateAction<Record<string, AnswerValue>>>;
+  setAnswer: (id: string, v: AnswerValue) => void;
 }) {
   const econ = useEconomy();
   const open = econ.bounties.filter((b) => b.status === "open").slice(0, 3);
@@ -407,10 +871,7 @@ function CoachChips({
             key={b.text}
             type="button"
             onClick={() =>
-              setAnswers((a) => ({
-                ...a,
-                T3: { kind: "enum", value: t3?.kind === "enum" ? t3.value : "", note: b.text },
-              }))
+              setAnswer("T3", { kind: "enum", value: t3?.kind === "enum" ? t3.value : "", note: b.text })
             }
             className="rounded-full border border-line px-3 py-1 text-[0.6875rem] text-muted hover:border-accent hover:text-ink"
           >
@@ -436,24 +897,58 @@ function Wrap({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The Student's sealed record, re-presented to the Teacher as a report. */
-function SealedRecord({ answers, mvd }: { answers: Record<string, AnswerValue>; mvd: boolean }) {
+/** The Student's sealed record, re-presented to the Teacher as a report:
+ *  section prose, anchors, and the user's own questions — the whole file. */
+function SealedRecord({
+  answers,
+  area,
+  mvd,
+}: {
+  answers: Record<string, AnswerValue>;
+  area: Area;
+  mvd: boolean;
+}) {
   const [open, setOpen] = useState(true);
   const rows: { label: string; value: string }[] = [];
-  const s1 = answers.S1;
-  if (s1?.kind === "binary") rows.push({ label: "Mission claim", value: `${s1.value ? "Done" : "Not done"} — ${s1.evidence ?? "no evidence"}` });
-  const s2 = answers.S2;
-  if (s2?.kind === "list") rows.push({ label: "Completed", value: s2.items.join(" · ") });
-  if (s2?.kind === "line") rows.push({ label: "Completed", value: s2.value });
-  const s3 = answers.S3;
-  if (s3?.kind === "count")
-    rows.push({ label: "Numbers", value: Object.entries(s3.values).map(([k, v]) => `${k} ${v}`).join(" · ") });
-  const s4 = answers.S4;
-  if (s4?.kind === "line") rows.push({ label: "Avoided", value: `${s4.value}${s4.second ? ` → instead: ${s4.second}` : ""}` });
-  const st1 = answers.ST1;
-  if (st1?.kind === "text") rows.push({ label: "Miss timeline", value: st1.value });
-  const s5 = answers.S5;
-  if (s5?.kind === "line") rows.push({ label: "Conditions", value: s5.value });
+
+  const anchorRow = (id: string) => {
+    const v = answers[id];
+    if (!v) return;
+    if (id === "S1" && v.kind === "binary")
+      rows.push({ label: "Mission claim", value: `${v.value ? "Done" : "Not done"} — ${v.evidence ?? "no evidence"}` });
+    if (id === "S2" && v.kind === "list") rows.push({ label: "Completed", value: v.items.join(" · ") });
+    if (id === "S2" && v.kind === "line") rows.push({ label: "Completed", value: v.value });
+    if (id === "S3" && v.kind === "count")
+      rows.push({ label: "Numbers", value: Object.entries(v.values).map(([k, n]) => `${k} ${n}`).join(" · ") });
+    if (id === "S4" && v.kind === "line")
+      rows.push({ label: "Avoided", value: `${v.value}${v.second ? ` → instead: ${v.second}` : ""}` });
+    if (id === "S5" && v.kind === "line") rows.push({ label: "Conditions", value: v.value });
+  };
+
+  if (mvd) {
+    anchorRow("S1");
+    anchorRow("S2");
+  } else {
+    for (const sec of sectionsFor("student")) {
+      for (const id of sec.anchors) anchorRow(id);
+      if (sec.id === "sec-s2") {
+        const st1 = answers.ST1;
+        if (st1?.kind === "text" && st1.value.trim()) rows.push({ label: "Miss timeline", value: st1.value });
+      }
+      const prose = answers[sec.proseId];
+      if (prose?.kind === "text" && prose.value.trim())
+        rows.push({ label: effectiveSection(sec, area).name, value: prose.value });
+      if (sec.cause) {
+        const c = answers[sec.cause.id];
+        if (c?.kind === "enum" && c.value) rows.push({ label: "Cause named", value: c.value });
+      }
+    }
+    for (const c of customsFor(area, "student")) {
+      const v = answers[c.id];
+      if ((v?.kind === "line" || v?.kind === "text") && v.value.trim())
+        rows.push({ label: c.prompt.slice(0, 40), value: v.value });
+    }
+  }
 
   return (
     <Card rule className="mt-6">
@@ -467,13 +962,23 @@ function SealedRecord({ answers, mvd }: { answers: Record<string, AnswerValue>; 
         <span className="type-mono text-[0.6875rem] text-muted lg:hidden">{open ? "collapse" : "read"}</span>
       </button>
       {open && (
-        <div className="mt-3 space-y-2.5 border-t border-line pt-3">
-          {rows.map((r) => (
-            <div key={r.label} className="grid grid-cols-[92px_1fr] gap-3 text-[0.8125rem]">
+        <div className="mt-3 max-h-[70vh] space-y-2.5 overflow-y-auto border-t border-line pt-3">
+          {rows.map((r, i) => (
+            <div key={`${r.label}-${i}`} className="grid grid-cols-[92px_1fr] gap-3 text-[0.8125rem]">
               <span className="type-mono text-muted">{r.label}</span>
-              <span className="text-ink">{r.value}</span>
+              <span className={`whitespace-pre-wrap ${isNoneText(r.value) ? "text-muted" : "text-ink"}`}>
+                {r.value}
+                {isNoneText(r.value) && (
+                  <span className="type-mono ml-2 text-[0.625rem] uppercase tracking-[0.15em] text-muted/60">
+                    · none — tracked
+                  </span>
+                )}
+              </span>
             </div>
           ))}
+          {rows.length === 0 && (
+            <p className="text-[0.8125rem] text-muted">A thin record. Judge what is written — nothing else exists.</p>
+          )}
         </div>
       )}
     </Card>
@@ -482,7 +987,7 @@ function SealedRecord({ answers, mvd }: { answers: Record<string, AnswerValue>; 
 
 /** Reverse shift: the mission remains — and the day's earnings are stated. */
 function CommitScreen({ answers, onDone }: { answers: Record<string, AnswerValue>; onDone: () => void }) {
-  const { ledger } = useApp();
+  const { ledger, prefs } = useApp();
   const t4 = answers.T4;
   const t5 = answers.T5;
   const t6 = answers.T6;
@@ -512,7 +1017,13 @@ function CommitScreen({ answers, onDone }: { answers: Record<string, AnswerValue
             <span className="text-accent">resolves at the next verdict</span>
           </div>
         </Card>
-        <SealReveal seal={drawSeal(today)} />
+        <SealReveal
+          seal={
+            prefs.customSealLabel?.trim()
+              ? { ...drawSeal(today), label: prefs.customSealLabel.trim() }
+              : drawSeal(today)
+          }
+        />
         <div className="type-mono mt-5 flex items-center justify-center gap-4 text-[0.75rem] text-muted">
           <span>candor +{candorBp}</span>
           <span>·</span>
@@ -530,4 +1041,3 @@ function CommitScreen({ answers, onDone }: { answers: Record<string, AnswerValue
     </div>
   );
 }
-

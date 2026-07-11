@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Archivo, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
+import { SwRegister } from "@/components/sw-register";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -24,10 +25,20 @@ export const metadata: Metadata = {
   title: "1% — personal performance system",
   description:
     "Student records reality. Teacher evaluates the record. One correction, one mission, every day.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "1%",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f1411",
+  themeColor: "#0a0c0b",
   width: "device-width",
   initialScale: 1,
 };
@@ -41,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="grain mode-fade min-h-dvh font-body antialiased">
         <AppProvider>{children}</AppProvider>
+        <SwRegister />
       </body>
     </html>
   );

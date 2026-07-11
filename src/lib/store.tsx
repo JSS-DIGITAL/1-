@@ -1,11 +1,14 @@
 "use client";
 
-// In-memory app store, shaped like a future API client: the components only
-// talk to selectors and actions, so swapping in a real backend is a transport
-// change, not a redesign. Mock data seeds it (see mock.ts).
+// The app store — device-local persistence, no backend. State hydrates from
+// localStorage on mount and writes through on every change (see persist.ts);
+// the app runs entirely on the user's own device. Components only talk to
+// selectors and actions, so a real backend later is a transport change, not
+// a redesign. Mock data is demo-only (Settings → load demo data).
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { generateMock, dayOffset } from "./mock";
+import { clearState, loadState, saveStateDebounced } from "./persist";
 import {
   achievementsFrom,
   balanceOf,
@@ -14,12 +17,16 @@ import {
   drawSeal,
   ECON,
   gripFrom,
+  isNoneText,
   momentumFromChain,
+  noneCountOf,
+  outcomeScore,
   personalRecordsFrom,
   rankFor,
   resolveWager,
   scoreCandor,
 } from "./economy";
+import { rollLoot, type CrackMethod, type VaultItem } from "./vault";
 import { SEED_FUEL } from "./motivation";
 import { candorForQuestion } from "./economy";
 import { HARD_LINES } from "./quotes";
@@ -35,15 +42,64 @@ import type {
   MotivationItem,
   Prefs,
   Recurrence,
+  VaultState,
 } from "./types";
 
-interface AccentPair {
+export interface AccentPair {
   accent: string;
   accentInk: string;
   name: string;
   /** Minimum rank index (economy.RANKS) required to equip. 0 = always. */
   rankReq: number;
 }
+
+/** Everything that survives a refresh — the whole app, on the user's device. */
+export interface Persisted {
+  areas: Area[];
+  records: DayRecord[];
+  missions: Mission[];
+  ledger: LedgerEntry[];
+  fuel: MotivationItem[];
+  savedFuelIds: string[];
+  focusLogs: FocusLog[];
+  prefs: Prefs;
+  accents: Record<Mode, AccentPair>;
+  vault: VaultState;
+  shieldHeld: boolean;
+  pinnedLine: string | null;
+  weeklyDoneWeek: string | null;
+}
+
+/** Day one, for real: one clean area, nothing invented. */
+function makeEmptyArea(): Area {
+  return {
+    id: "a1",
+    name: "Universal",
+    goal: "Get 1% better at the thing that matters",
+    metrics: [{ key: "minutes", label: "Focused minutes", unit: "min" }],
+    standards: [],
+    createdAt: dayOffset(0),
+  };
+}
+
+function makeEmptyVault(): VaultState {
+  return {
+    attempts: 0,
+    digits: { seal: false, candor: false, calibration: false },
+    digitValues: [0, 0, 0],
+    streak: 0,
+    masterAvailable: false,
+    unlocks: [],
+  };
+}
+
+const weekKeyOf = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00`);
+  return String(Math.floor((d.getTime() / 86400000 + 4) / 7));
+};
+
+// SSR renders once with empty defaults; the real hydrate runs before paint.
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export const ACCENT_PRESETS: Record<Mode, AccentPair[]> = {
   student: [
@@ -89,6 +145,16 @@ interface AppState {
   setPrefs: (p: Partial<Prefs>) => void;
   setAccent: (mode: Mode, pair: AccentPair) => void;
   addArea: (a: Omit<Area, "id" | "createdAt">) => void;
+  updateArea: (id: string, patch: Partial<Omit<Area, "id" | "createdAt">>) => void;
+  /** The Vault Game (§12.10). */
+  vault: VaultState;
+  spendVaultAttempt: () => boolean;
+  openVault: (method: CrackMethod) => VaultItem | null;
+  /** Device-local persistence controls (Settings → data). */
+  hydrated: boolean;
+  loadDemo: () => void;
+  wipeAll: () => void;
+  importData: (data: unknown) => boolean;
   completeToday: (opts: {
     areaId: string;
     kind: "full" | "mvd";
@@ -100,11 +166,11 @@ interface AppState {
 const Ctx = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const seed = useMemo(() => generateMock(), []);
-  const [areas, setAreas] = useState(seed.areas);
-  const [records, setRecords] = useState(seed.records);
-  const [missions, setMissions] = useState(seed.missions);
-  const [ledger, setLedger] = useState(seed.ledger);
+  const [hydrated, setHydrated] = useState(false);
+  const [areas, setAreas] = useState<Area[]>(() => [makeEmptyArea()]);
+  const [records, setRecords] = useState<DayRecord[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [mode, setModeState] = useState<Mode>("student");
   const [todayDone, setTodayDone] = useState(false);
   const [pendingS1, setPendingS1] = useState<boolean | null>(null);
@@ -122,13 +188,128 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [savedFuelIds, setSavedFuelIds] = useState<string[]>([]);
   const [shieldHeld, setShieldHeld] = useState(false);
   const [focusLogs, setFocusLogs] = useState<FocusLog[]>([]);
-  const [weeklyDone, setWeeklyDone] = useState(false);
+  const [weeklyDoneWeek, setWeeklyDoneWeek] = useState<string | null>(null);
+  const weeklyDone = weeklyDoneWeek === weekKeyOf(dayOffset(0));
   const [pinnedLine, setPinnedLine] = useState<string | null>(null);
+  const [vault, setVault] = useState<VaultState>(() => makeEmptyVault());
+
+  // ---- Hydrate from the device, once, before paint ----
+  useIsoLayoutEffect(() => {
+    const saved = loadState<Persisted>();
+    if (saved) {
+      const today = dayOffset(0);
+      setAreas(saved.areas?.length ? saved.areas : [makeEmptyArea()]);
+      setRecords(saved.records ?? []);
+      setMissions(saved.missions ?? []);
+      setLedger(saved.ledger ?? []);
+      setFuel(saved.fuel?.length ? saved.fuel : SEED_FUEL);
+      setSavedFuelIds(saved.savedFuelIds ?? []);
+      setFocusLogs(saved.focusLogs ?? []);
+      if (saved.prefs) setPrefsState((p) => ({ ...p, ...saved.prefs }));
+      if (saved.accents) setAccents(saved.accents);
+      setShieldHeld(Boolean(saved.shieldHeld));
+      setPinnedLine(saved.pinnedLine ?? null);
+      setWeeklyDoneWeek(saved.weeklyDoneWeek ?? null);
+      const v = saved.vault ?? makeEmptyVault();
+      // Yesterday's honesty doesn't open tonight's vault: stale digits reset.
+      setVault(
+        v.digitsDate === today
+          ? v
+          : { ...v, digits: { seal: false, candor: false, calibration: false }, digitValues: [0, 0, 0], digitsDate: undefined }
+      );
+      setTodayDone((saved.records ?? []).some((r) => r.date === today));
+    }
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [accents, setAccents] = useState<Record<Mode, AccentPair>>({
     student: ACCENT_PRESETS.student[0],
     teacher: ACCENT_PRESETS.teacher[0],
   });
   const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ---- Write-through: every change lands on the device (debounced) ----
+  useEffect(() => {
+    if (!hydrated) return;
+    const snapshot: Persisted = {
+      areas,
+      records,
+      missions,
+      ledger,
+      fuel,
+      savedFuelIds,
+      focusLogs,
+      prefs,
+      accents,
+      vault,
+      shieldHeld,
+      pinnedLine,
+      weeklyDoneWeek,
+    };
+    saveStateDebounced(snapshot);
+  }, [hydrated, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek]);
+
+  // ---- Data controls (Settings): demo world, clean slate, backup import ----
+
+  const loadDemo = useCallback(() => {
+    const seed = generateMock();
+    setAreas(seed.areas);
+    setRecords(seed.records);
+    setMissions(seed.missions);
+    setLedger(seed.ledger);
+    setFuel(SEED_FUEL);
+    setSavedFuelIds([]);
+    setFocusLogs([]);
+    setShieldHeld(false);
+    setPinnedLine(null);
+    setWeeklyDoneWeek(null);
+    setVault({
+      attempts: 1,
+      digits: { seal: true, candor: true, calibration: false },
+      digitValues: [7, 3, 4],
+      digitsDate: dayOffset(0),
+      lastOpen: dayOffset(-1),
+      streak: 6,
+      masterAvailable: false,
+      unlocks: [],
+    });
+    setTodayDone(false);
+  }, []);
+
+  const wipeAll = useCallback(() => {
+    clearState();
+    setAreas([makeEmptyArea()]);
+    setRecords([]);
+    setMissions([]);
+    setLedger([]);
+    setFuel(SEED_FUEL);
+    setSavedFuelIds([]);
+    setFocusLogs([]);
+    setShieldHeld(false);
+    setPinnedLine(null);
+    setWeeklyDoneWeek(null);
+    setVault(makeEmptyVault());
+    setTodayDone(false);
+  }, []);
+
+  const importData = useCallback((data: unknown): boolean => {
+    const d = data as Partial<Persisted>;
+    if (!d || !Array.isArray(d.areas) || !Array.isArray(d.records) || !Array.isArray(d.missions) || !Array.isArray(d.ledger))
+      return false;
+    setAreas(d.areas.length > 0 ? d.areas : [makeEmptyArea()]);
+    setRecords(d.records);
+    setMissions(d.missions);
+    setLedger(d.ledger);
+    if (Array.isArray(d.fuel) && d.fuel.length > 0) setFuel(d.fuel);
+    if (Array.isArray(d.savedFuelIds)) setSavedFuelIds(d.savedFuelIds);
+    if (Array.isArray(d.focusLogs)) setFocusLogs(d.focusLogs);
+    if (d.prefs) setPrefsState((p) => ({ ...p, ...d.prefs }));
+    if (d.accents) setAccents(d.accents);
+    if (d.vault) setVault(d.vault);
+    setWeeklyDoneWeek(d.weeklyDoneWeek ?? null);
+    setTodayDone(d.records.some((r) => r.date === dayOffset(0)));
+    return true;
+  }, []);
 
   const setMode = useCallback((m: Mode, fade = true) => {
     const root = document.documentElement;
@@ -158,6 +339,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addArea = useCallback((a: Omit<Area, "id" | "createdAt">) => {
     setAreas((s) => [...s, { ...a, id: `a${s.length + 1}-${Date.now()}`, createdAt: dayOffset(0) }]);
   }, []);
+
+  /** Per-area edits — question overrides, custom questions, targets. */
+  const updateArea = useCallback((id: string, patch: Partial<Omit<Area, "id" | "createdAt">>) => {
+    setAreas((s) => s.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  }, []);
+
+  // ---- The Vault Game (§12.10): attempts are earned by sealing; the method
+  // dictates the loot tier; one open per day (the Master Vault is exempt). ----
+
+  const spendVaultAttempt = useCallback((): boolean => {
+    if (vault.attempts <= 0) return false;
+    setVault((v) => ({ ...v, attempts: Math.max(0, v.attempts - 1) }));
+    return true;
+  }, [vault.attempts]);
+
+  const openVault = useCallback(
+    (method: CrackMethod): VaultItem | null => {
+      const today = dayOffset(0);
+      if (method === "master") {
+        if (!vault.masterAvailable) return null;
+      } else {
+        if (vault.lastOpen === today) return null;
+        if (
+          method === "combination" &&
+          !(vault.digits.seal && vault.digits.candor && vault.digits.calibration)
+        )
+          return null;
+      }
+      const item = rollLoot(method, vault.unlocks);
+      if (item.kind === "bp" && item.bp) {
+        setLedger((l) => [
+          ...l,
+          { date: today, book: "judgment", source: "vault", bp: item.bp ?? 0, note: `vault cracked · ${item.name}` },
+        ]);
+      }
+      setVault((v) => {
+        const unlockable =
+          item.kind === "accent" ||
+          item.kind === "sealskin" ||
+          item.kind === "feature" ||
+          (item.kind === "archive" && item.permanent);
+        const unlocks = unlockable && !v.unlocks.includes(item.id) ? [...v.unlocks, item.id] : v.unlocks;
+        const opensArchive = item.kind === "archive" || method === "combination" || method === "master";
+        const archiveUntil = opensArchive ? today : v.archiveUntil;
+        if (method === "master") return { ...v, unlocks, archiveUntil, masterAvailable: false, streak: 0 };
+        const streak = v.lastOpen === dayOffset(-1) ? v.streak + 1 : 1;
+        return { ...v, unlocks, archiveUntil, lastOpen: today, streak, masterAvailable: v.masterAvailable || streak >= 7 };
+      });
+      return item;
+    },
+    [vault]
+  );
 
   const completeToday = useCallback(
     ({
@@ -249,9 +482,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         note: kind === "mvd" ? "minimum day sealed" : "record sealed",
       });
 
+      // The Signet (legendary vault unlock): the user's words on the seal.
+      const seal = drawSeal(today);
+      if (prefs.customSealLabel?.trim()) seal.label = prefs.customSealLabel.trim();
+
+      // The Vault Game: sealing earns a skill attempt and tonight's digits —
+      // seal (verifiable act), candor (real avoidance named), calibration
+      // (the wager landed within ±2). Digit values derive from the day.
+      const s4v = answers.S4;
+      const candorDigit = s4v?.kind === "line" && s4v.value.trim().length > 0 && !isNoneText(s4v.value);
+      const standingForDigits = missions.find((m) => m.date === today && !m.outcome);
+      const calibrationDigit = Boolean(
+        standingForDigits &&
+          t1?.kind === "enum" &&
+          Math.abs(standingForDigits.confidence - outcomeScore(t1.value as MissionOutcome) * 10) <= 2
+      );
+      setVault((v) => ({
+        ...v,
+        attempts: Math.min(3, v.attempts + 1),
+        digits: { seal: true, candor: candorDigit, calibration: calibrationDigit },
+        digitsDate: today,
+        digitValues: [
+          candor.bp % 10,
+          chainFrom(missions) % 10,
+          (balanceOf(ledger) + candor.bp) % 10,
+        ],
+      }));
+
       setRecords((rs) => [
         ...rs,
-        { date: today, areaId, kind, sealed: true, answers, weakness, seal: drawSeal(today) },
+        {
+          date: today,
+          areaId,
+          kind,
+          sealed: true,
+          answers,
+          weakness,
+          seal,
+          noneCount: noneCountOf(answers),
+        },
       ]);
       const prevRank = rankFor(balanceOf(ledger));
       const nextRank = rankFor(balanceOf([...ledger, ...newEntries]));
@@ -259,7 +528,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLedger((l) => [...l, ...newEntries]);
       setTodayDone(true);
     },
-    [missions, ledger, shieldHeld]
+    [missions, ledger, shieldHeld, prefs.customSealLabel]
   );
 
   const clearRankUp = useCallback(() => setRankUp(null), []);
@@ -320,7 +589,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         note: `weekly debrief · target: ${targetWeakness.slice(0, 60)}`,
       },
     ]);
-    setWeeklyDone(true);
+    setWeeklyDoneWeek(weekKeyOf(dayOffset(0)));
   }, [weeklyDone]);
 
   const value: AppState = {
@@ -354,6 +623,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPrefs,
     setAccent,
     addArea,
+    updateArea,
+    vault,
+    spendVaultAttempt,
+    openVault,
+    hydrated,
+    loadDemo,
+    wipeAll,
+    importData,
     completeToday,
   };
 
