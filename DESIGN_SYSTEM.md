@@ -325,6 +325,21 @@ wheel** (framer pan → MotionValue rotation).
   accent picker gains vault exclusives (rarity-colored borders, "crack the vault" when unowned) + the
   Signet input; the area editor's custom-question cap reads 2+1 with The Third Question.
 
+## 8i · Persistence, PWA, production (added 2026-07-10)
+
+- **Device-local persistence** (`src/lib/persist.ts`): whole app state in `localStorage["one-percent-v1"]`
+  (versioned envelope, debounced write-through, hydrate-before-paint). No backend, no account, no cloud —
+  the app runs on the user's own device; Settings → export is the backup (iOS storage-eviction note in UI).
+  First run is EMPTY (one Universal area, real day one); the mock world is demo-only (Settings → load
+  demo / wipe / import). `todayDone`/`weeklyDone` derive from dates; vault digits stale-reset by
+  `digitsDate` — yesterday's honesty doesn't open tonight's vault.
+- **PWA**: `manifest.webmanifest` (standalone, start `/today`), generated icons (`scripts/gen-icons.mjs`,
+  sharp), minimal hand-rolled `sw.js` (network-first pages, cache-first static, versioned cache),
+  production-only registration. Installable from Chrome ("Install app") and iOS ("Add to Home Screen").
+- **Production**: Vercel project `one-percent` (team jugraj-sidhu-s-projects), deployed from disk via
+  `vercel deploy --prod`. Live: **https://one-percent-eta.vercel.app**. GitHub remote pending (needs a
+  one-time repo creation + GCM push); until then, redeploys are one CLI command.
+
 ## 9 · Audit results (run against the built prototype, all screens screenshotted)
 
 | # | Test | Result | Evidence |
