@@ -33,8 +33,13 @@ import { candorForQuestion } from "./economy";
 import { HARD_LINES } from "./quotes";
 import type {
   Account,
+  ActivityEntry,
+  ActivityGoals,
   Area,
   AnswerValue,
+  Bill,
+  BudgetCategory,
+  BudgetSettings,
   DayRecord,
   FocusLog,
   HealthDay,
@@ -45,11 +50,19 @@ import type {
   Mode,
   MotivationItem,
   Prefs,
+  Quit,
   Recurrence,
+  Relapse,
+  SavedExercise,
   SavedFood,
+  SavingsGoal,
+  Transaction,
+  Urge,
   VaultState,
 } from "./types";
 import { DEFAULT_HEALTH_GOALS, emptyHealthDay } from "./health";
+import { DEFAULT_ACTIVITY_GOALS } from "./activity";
+import { DEFAULT_BUDGET_SETTINGS, DEFAULT_CATEGORIES } from "./budget";
 
 export interface AccentPair {
   accent: string;
@@ -78,6 +91,15 @@ export interface Persisted {
   healthDays: HealthDay[];
   healthGoals: HealthGoals;
   savedFoods: SavedFood[];
+  quits: Quit[];
+  activityEntries: ActivityEntry[];
+  activityGoals: ActivityGoals;
+  savedExercises: SavedExercise[];
+  budgetCategories: BudgetCategory[];
+  transactions: Transaction[];
+  bills: Bill[];
+  savingsGoals: SavingsGoal[];
+  budgetSettings: BudgetSettings;
 }
 
 /** Guest sessions ("try free") never write to the device. Tab-scoped. */
@@ -173,6 +195,40 @@ interface AppState {
   updateHealthDay: (date: string, patch: Partial<Omit<HealthDay, "date">>) => void;
   setHealthGoals: (patch: Partial<HealthGoals>) => void;
   addSavedFood: (food: SavedFood) => void;
+  /** Quit engine — bad habits + addiction (separate section; no loop/economy). */
+  quits: Quit[];
+  addQuit: (quit: Quit) => void;
+  updateQuit: (id: string, patch: Partial<Omit<Quit, "id" | "kind" | "createdAt">>) => void;
+  removeQuit: (id: string) => void;
+  logRelapse: (id: string, relapse: Relapse) => void;
+  setQuitCheckin: (id: string, date: string, clean: boolean) => void;
+  logUrge: (id: string, urge: Urge) => void;
+  /** Physical activity (separate section; no loop/economy). */
+  activityEntries: ActivityEntry[];
+  activityGoals: ActivityGoals;
+  savedExercises: SavedExercise[];
+  addActivityEntry: (entry: ActivityEntry) => void;
+  removeActivityEntry: (id: string) => void;
+  setActivityGoals: (patch: Partial<ActivityGoals>) => void;
+  addSavedExercise: (ex: SavedExercise) => void;
+  /** Budget (separate section; no loop/economy). */
+  budgetCategories: BudgetCategory[];
+  transactions: Transaction[];
+  bills: Bill[];
+  savingsGoals: SavingsGoal[];
+  budgetSettings: BudgetSettings;
+  addCategory: (cat: BudgetCategory) => void;
+  updateCategory: (id: string, patch: Partial<Omit<BudgetCategory, "id">>) => void;
+  removeCategory: (id: string) => void;
+  addTransaction: (txn: Transaction) => void;
+  removeTransaction: (id: string) => void;
+  addBill: (bill: Bill) => void;
+  updateBill: (id: string, patch: Partial<Omit<Bill, "id">>) => void;
+  removeBill: (id: string) => void;
+  addSavingsGoal: (goal: SavingsGoal) => void;
+  updateSavingsGoal: (id: string, patch: Partial<Omit<SavingsGoal, "id">>) => void;
+  removeSavingsGoal: (id: string) => void;
+  setBudgetSettings: (patch: Partial<BudgetSettings>) => void;
   /** Device-local persistence controls (Settings → data). */
   hydrated: boolean;
   loadDemo: () => void;
@@ -225,6 +281,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [healthDays, setHealthDays] = useState<HealthDay[]>([]);
   const [healthGoals, setHealthGoalsState] = useState<HealthGoals>(DEFAULT_HEALTH_GOALS);
   const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
+  const [quits, setQuits] = useState<Quit[]>([]);
+  const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([]);
+  const [activityGoals, setActivityGoalsState] = useState<ActivityGoals>(DEFAULT_ACTIVITY_GOALS);
+  const [savedExercises, setSavedExercises] = useState<SavedExercise[]>([]);
+  const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>(DEFAULT_CATEGORIES);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [budgetSettings, setBudgetSettingsState] = useState<BudgetSettings>(DEFAULT_BUDGET_SETTINGS);
 
   const applySaved = useCallback((saved: Persisted) => {
     const today = dayOffset(0);
@@ -244,6 +309,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHealthDays(saved.healthDays ?? []);
     setHealthGoalsState(saved.healthGoals ?? DEFAULT_HEALTH_GOALS);
     setSavedFoods(saved.savedFoods ?? []);
+    setQuits(saved.quits ?? []);
+    setActivityEntries(saved.activityEntries ?? []);
+    setActivityGoalsState(saved.activityGoals ?? DEFAULT_ACTIVITY_GOALS);
+    setSavedExercises(saved.savedExercises ?? []);
+    setBudgetCategories(saved.budgetCategories?.length ? saved.budgetCategories : DEFAULT_CATEGORIES);
+    setTransactions(saved.transactions ?? []);
+    setBills(saved.bills ?? []);
+    setSavingsGoals(saved.savingsGoals ?? []);
+    setBudgetSettingsState(saved.budgetSettings ?? DEFAULT_BUDGET_SETTINGS);
     const v = saved.vault ?? makeEmptyVault();
     // Yesterday's honesty doesn't open tonight's vault: stale digits reset.
     setVault(
@@ -328,12 +402,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     healthDays,
     healthGoals,
     savedFoods,
+    quits,
+    activityEntries,
+    activityGoals,
+    savedExercises,
+    budgetCategories,
+    transactions,
+    bills,
+    savingsGoals,
+    budgetSettings,
   };
   useEffect(() => {
     if (!hydrated || isGuest) return;
     saveStateDebounced(snapshot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, isGuest, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek, account, healthDays, healthGoals, savedFoods]);
+  }, [hydrated, isGuest, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek, account, healthDays, healthGoals, savedFoods, quits, activityEntries, activityGoals, savedExercises, budgetCategories, transactions, bills, savingsGoals, budgetSettings]);
 
   // ---- Health actions (separate section; loop and economy never touch it) ----
 
@@ -356,6 +439,95 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [...s.filter((f) => f.name.trim().toLowerCase() !== key), { ...food, name: food.name.trim() }];
     });
   }, []);
+
+  // ---- Quit engine actions (bad habits + addiction; no loop/economy) ----
+
+  const addQuit = useCallback((quit: Quit) => setQuits((q) => [...q, quit]), []);
+
+  const updateQuit = useCallback(
+    (id: string, patch: Partial<Omit<Quit, "id" | "kind" | "createdAt">>) =>
+      setQuits((q) => q.map((x) => (x.id === id ? { ...x, ...patch } : x))),
+    []
+  );
+
+  const removeQuit = useCallback((id: string) => setQuits((q) => q.filter((x) => x.id !== id)), []);
+
+  const logRelapse = useCallback(
+    (id: string, relapse: Relapse) =>
+      setQuits((q) => q.map((x) => (x.id === id ? { ...x, relapses: [...x.relapses, relapse] } : x))),
+    []
+  );
+
+  const setQuitCheckin = useCallback(
+    (id: string, date: string, clean: boolean) =>
+      setQuits((q) => q.map((x) => (x.id === id ? { ...x, checkins: { ...x.checkins, [date]: clean } } : x))),
+    []
+  );
+
+  const logUrge = useCallback(
+    (id: string, urge: Urge) =>
+      setQuits((q) => q.map((x) => (x.id === id ? { ...x, urges: [...x.urges, urge] } : x))),
+    []
+  );
+
+  // ---- Physical activity actions (no loop/economy) ----
+
+  const addActivityEntry = useCallback((entry: ActivityEntry) => setActivityEntries((e) => [...e, entry]), []);
+
+  const removeActivityEntry = useCallback(
+    (id: string) => setActivityEntries((e) => e.filter((x) => x.id !== id)),
+    []
+  );
+
+  const setActivityGoals = useCallback(
+    (patch: Partial<ActivityGoals>) => setActivityGoalsState((g) => ({ ...g, ...patch })),
+    []
+  );
+
+  const addSavedExercise = useCallback((ex: SavedExercise) => {
+    setSavedExercises((s) => {
+      const key = ex.name.trim().toLowerCase();
+      if (!key) return s;
+      return [...s.filter((f) => f.name.trim().toLowerCase() !== key), { ...ex, name: ex.name.trim() }];
+    });
+  }, []);
+
+  // ---- Budget actions (separate section; no loop/economy) ----
+
+  const addCategory = useCallback((cat: BudgetCategory) => setBudgetCategories((c) => [...c, cat]), []);
+  const updateCategory = useCallback(
+    (id: string, patch: Partial<Omit<BudgetCategory, "id">>) =>
+      setBudgetCategories((c) => c.map((x) => (x.id === id ? { ...x, ...patch } : x))),
+    []
+  );
+  const removeCategory = useCallback((id: string) => {
+    setBudgetCategories((c) => c.filter((x) => x.id !== id));
+    // Orphan the category on its transactions rather than deleting the money record.
+    setTransactions((t) => t.map((x) => (x.categoryId === id ? { ...x, categoryId: undefined } : x)));
+  }, []);
+
+  const addTransaction = useCallback((txn: Transaction) => setTransactions((t) => [...t, txn]), []);
+  const removeTransaction = useCallback((id: string) => setTransactions((t) => t.filter((x) => x.id !== id)), []);
+
+  const addBill = useCallback((bill: Bill) => setBills((b) => [...b, bill]), []);
+  const updateBill = useCallback(
+    (id: string, patch: Partial<Omit<Bill, "id">>) => setBills((b) => b.map((x) => (x.id === id ? { ...x, ...patch } : x))),
+    []
+  );
+  const removeBill = useCallback((id: string) => setBills((b) => b.filter((x) => x.id !== id)), []);
+
+  const addSavingsGoal = useCallback((goal: SavingsGoal) => setSavingsGoals((g) => [...g, goal]), []);
+  const updateSavingsGoal = useCallback(
+    (id: string, patch: Partial<Omit<SavingsGoal, "id">>) =>
+      setSavingsGoals((g) => g.map((x) => (x.id === id ? { ...x, ...patch } : x))),
+    []
+  );
+  const removeSavingsGoal = useCallback((id: string) => setSavingsGoals((g) => g.filter((x) => x.id !== id)), []);
+
+  const setBudgetSettings = useCallback(
+    (patch: Partial<BudgetSettings>) => setBudgetSettingsState((s) => ({ ...s, ...patch })),
+    []
+  );
 
   /** The full snapshot — Settings export uses this so backups miss nothing. */
   const exportSnapshot = useCallback((): Persisted => snapshot, [snapshot]);
@@ -424,6 +596,84 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       profile: { sex: "male", age: 28, heightCm: 180, weightKg: 84, activity: "moderate" },
     });
     setSavedFoods([]);
+    // Demo quits: one clean run, one with a slip 12 days back.
+    setQuits([
+      {
+        id: "demo-hab-1",
+        kind: "habit",
+        name: "Doomscrolling before bed",
+        startedAt: dayOffset(-23),
+        createdAt: dayOffset(-23),
+        unit: "hours",
+        perDay: 1.5,
+        costPerUnit: 0,
+        minutesPerUnit: 60,
+        reason: "Sleep and mornings",
+        relapses: [],
+        urges: [
+          { id: "demo-ug-1", at: Date.now() - 3 * 86400000, intensity: 3, trigger: "boredom", resisted: true },
+          { id: "demo-ug-2", at: Date.now() - 86400000, intensity: 4, trigger: "stress", resisted: true },
+        ],
+        checkins: {},
+      },
+      {
+        id: "demo-rec-1",
+        kind: "addiction",
+        name: "Alcohol",
+        startedAt: dayOffset(-40),
+        createdAt: dayOffset(-40),
+        unit: "drinks",
+        perDay: 4,
+        costPerUnit: 6,
+        minutesPerUnit: 0,
+        reason: "Health and clarity",
+        relapses: [{ id: "demo-rl-1", date: dayOffset(-12), trigger: "party", note: "reset and kept going" }],
+        urges: [{ id: "demo-ug-3", at: Date.now() - 2 * 86400000, intensity: 2, trigger: "social", resisted: true }],
+        checkins: {},
+      },
+    ]);
+    // Demo activity: five sessions across the last week.
+    setActivityEntries([
+      { id: "demo-act-1", date: dayOffset(-6), name: "Running", category: "Cardio", minutes: 35, intensity: "moderate" },
+      { id: "demo-act-2", date: dayOffset(-5), name: "Squat", category: "Strength", sets: [{ reps: 8, weightKg: 80 }, { reps: 8, weightKg: 80 }, { reps: 6, weightKg: 85 }], intensity: "hard" },
+      { id: "demo-act-3", date: dayOffset(-3), name: "Yoga", category: "Mobility", minutes: 40, intensity: "easy" },
+      { id: "demo-act-4", date: dayOffset(-1), name: "Cycling", category: "Cardio", minutes: 50, intensity: "moderate" },
+      { id: "demo-act-5", date: dayOffset(0), name: "Bench press", category: "Strength", sets: [{ reps: 10, weightKg: 60 }, { reps: 8, weightKg: 65 }], intensity: "hard" },
+    ]);
+    setActivityGoalsState({ weeklyMinutes: 150, weeklySessions: 4 });
+    setSavedExercises([]);
+    // Demo budget: an income, a few capped categories, this month's spend, bills, a goal.
+    setBudgetCategories([
+      { id: "cat-rent", name: "Rent / Mortgage", kind: "expense", limit: 2200 },
+      { id: "cat-groceries", name: "Groceries", kind: "expense", limit: 700 },
+      { id: "cat-transport", name: "Transport", kind: "expense", limit: 250 },
+      { id: "cat-utilities", name: "Utilities", kind: "expense", limit: 300 },
+      { id: "cat-dining", name: "Dining out", kind: "expense", limit: 300 },
+      { id: "cat-entertainment", name: "Entertainment", kind: "expense", limit: 150 },
+      { id: "cat-subscriptions", name: "Subscriptions", kind: "expense", limit: 80 },
+      { id: "cat-shopping", name: "Shopping", kind: "expense", limit: 200 },
+      { id: "cat-income", name: "Income", kind: "income" },
+    ]);
+    setTransactions([
+      { id: "tx-1", date: dayOffset(-1), amount: 2200, kind: "expense", categoryId: "cat-rent", note: "Rent" },
+      { id: "tx-2", date: dayOffset(-2), amount: 96.4, kind: "expense", categoryId: "cat-groceries", note: "Woolies" },
+      { id: "tx-3", date: dayOffset(-4), amount: 82.15, kind: "expense", categoryId: "cat-groceries", note: "Coles" },
+      { id: "tx-4", date: dayOffset(-3), amount: 64, kind: "expense", categoryId: "cat-transport", note: "Fuel" },
+      { id: "tx-5", date: dayOffset(-5), amount: 128, kind: "expense", categoryId: "cat-dining", note: "Dinner out" },
+      { id: "tx-6", date: dayOffset(-2), amount: 220, kind: "expense", categoryId: "cat-utilities", note: "Electricity" },
+      { id: "tx-7", date: dayOffset(-6), amount: 175, kind: "expense", categoryId: "cat-shopping", note: "Shoes" },
+      { id: "tx-8", date: dayOffset(-7), amount: 6000, kind: "income", categoryId: "cat-income", note: "Salary" },
+    ]);
+    setBills([
+      { id: "bill-1", name: "Rent", amount: 2200, dueDay: 1, cadence: "monthly", categoryId: "cat-rent", active: true },
+      { id: "bill-2", name: "Netflix", amount: 25, dueDay: 12, cadence: "monthly", categoryId: "cat-subscriptions", active: true },
+      { id: "bill-3", name: "Gym", amount: 22, dueDay: 20, cadence: "weekly", categoryId: "cat-health", active: true },
+    ]);
+    setSavingsGoals([
+      { id: "goal-1", name: "Emergency fund", target: 10000, saved: 3400, by: "end of year" },
+      { id: "goal-2", name: "Japan trip", target: 5000, saved: 1250, by: "next spring" },
+    ]);
+    setBudgetSettingsState({ monthlyIncome: 6000, currencySymbol: "$" });
     setTodayDone(false);
   }, []);
 
@@ -444,6 +694,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHealthDays([]);
     setHealthGoalsState(DEFAULT_HEALTH_GOALS);
     setSavedFoods([]);
+    setQuits([]);
+    setActivityEntries([]);
+    setActivityGoalsState(DEFAULT_ACTIVITY_GOALS);
+    setSavedExercises([]);
+    setBudgetCategories(DEFAULT_CATEGORIES);
+    setTransactions([]);
+    setBills([]);
+    setSavingsGoals([]);
+    setBudgetSettingsState(DEFAULT_BUDGET_SETTINGS);
     setTodayDone(false);
   }, []);
 
@@ -464,6 +723,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (Array.isArray(d.healthDays)) setHealthDays(d.healthDays);
     if (d.healthGoals) setHealthGoalsState(d.healthGoals);
     if (Array.isArray(d.savedFoods)) setSavedFoods(d.savedFoods);
+    if (Array.isArray(d.quits)) setQuits(d.quits);
+    if (Array.isArray(d.activityEntries)) setActivityEntries(d.activityEntries);
+    if (d.activityGoals) setActivityGoalsState(d.activityGoals);
+    if (Array.isArray(d.savedExercises)) setSavedExercises(d.savedExercises);
+    if (Array.isArray(d.budgetCategories)) setBudgetCategories(d.budgetCategories.length ? d.budgetCategories : DEFAULT_CATEGORIES);
+    if (Array.isArray(d.transactions)) setTransactions(d.transactions);
+    if (Array.isArray(d.bills)) setBills(d.bills);
+    if (Array.isArray(d.savingsGoals)) setSavingsGoals(d.savingsGoals);
+    if (d.budgetSettings) setBudgetSettingsState(d.budgetSettings);
     setWeeklyDoneWeek(d.weeklyDoneWeek ?? null);
     setTodayDone(d.records.some((r) => r.date === dayOffset(0)));
     return true;
@@ -791,6 +1059,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateHealthDay,
     setHealthGoals,
     addSavedFood,
+    quits,
+    addQuit,
+    updateQuit,
+    removeQuit,
+    logRelapse,
+    setQuitCheckin,
+    logUrge,
+    activityEntries,
+    activityGoals,
+    savedExercises,
+    addActivityEntry,
+    removeActivityEntry,
+    setActivityGoals,
+    addSavedExercise,
+    budgetCategories,
+    transactions,
+    bills,
+    savingsGoals,
+    budgetSettings,
+    addCategory,
+    updateCategory,
+    removeCategory,
+    addTransaction,
+    removeTransaction,
+    addBill,
+    updateBill,
+    removeBill,
+    addSavingsGoal,
+    updateSavingsGoal,
+    removeSavingsGoal,
+    setBudgetSettings,
     hydrated,
     loadDemo,
     wipeAll,

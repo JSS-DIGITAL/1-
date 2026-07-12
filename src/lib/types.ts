@@ -205,6 +205,133 @@ export interface SavedFood {
   fat?: number;
 }
 
+// ---- Quit engine (bad habits + addiction; separate section — no loop/economy) ----
+// One data model, two framings: "habit" = a bad habit to break, "addiction" =
+// something to recover from. Nothing here pays bp or touches the review.
+
+export type QuitKind = "habit" | "addiction";
+
+export interface Relapse {
+  id: string;
+  /** ISO date the slip happened; the clean streak restarts the next day. */
+  date: string;
+  trigger?: string;
+  note?: string;
+}
+
+export interface Urge {
+  id: string;
+  /** Timestamp (ms) — urges are moments, not days. */
+  at: number;
+  /** 1 (mild) – 5 (overwhelming). */
+  intensity: number;
+  trigger?: string;
+  /** Did they hold the line? */
+  resisted: boolean;
+}
+
+export interface Quit {
+  id: string;
+  kind: QuitKind;
+  name: string;
+  /** ISO date the current clean run began (quit date or day after last relapse). */
+  startedAt: string;
+  createdAt: string;
+  /** The economics of the habit — all optional; power money/time-saved. */
+  unit?: string; // "cigarettes", "drinks", "scrolls"
+  perDay?: number; // how many per day before quitting
+  costPerUnit?: number; // dollars per unit
+  minutesPerUnit?: number; // minutes lost per unit
+  reason?: string; // why they're quitting
+  relapses: Relapse[];
+  urges: Urge[];
+  /** date -> stayed clean that day (the daily checkbox log). */
+  checkins: Record<string, boolean>;
+  archived?: boolean;
+}
+
+// ---- Physical activity (dedicated movement tracker; separate section) ----
+
+export interface ActivitySet {
+  reps?: number;
+  weightKg?: number;
+}
+
+export type ActivityIntensity = "easy" | "moderate" | "hard";
+
+export interface ActivityEntry {
+  id: string;
+  date: string;
+  name: string;
+  category: string;
+  minutes?: number;
+  sets?: ActivitySet[];
+  intensity?: ActivityIntensity;
+  note?: string;
+}
+
+export interface ActivityGoals {
+  weeklyMinutes?: number;
+  weeklySessions?: number;
+}
+
+export interface SavedExercise {
+  name: string;
+  category: string;
+  /** "reps" logs sets×reps; "time" logs minutes. */
+  kind: "reps" | "time";
+  met?: number;
+}
+
+// ---- Budget (manual money tracker; separate section — no loop/economy) ----
+// Real dollars, device-local, no bank sync. Accent + neutrals only — gold stays
+// reserved for the bp economy so the two money systems never blur. Not advice.
+
+export type TxnKind = "expense" | "income";
+
+export interface BudgetCategory {
+  id: string;
+  name: string;
+  kind: TxnKind;
+  /** Monthly cap (expense categories); undefined = untracked. */
+  limit?: number;
+}
+
+export interface Transaction {
+  id: string;
+  date: string; // ISO
+  amount: number; // positive dollars
+  kind: TxnKind;
+  categoryId?: string;
+  note?: string;
+}
+
+export type BillCadence = "weekly" | "monthly" | "yearly";
+
+export interface Bill {
+  id: string;
+  name: string;
+  amount: number;
+  /** Day of month it's due (1–31); for weekly, treated as a day-of-week hint only. */
+  dueDay: number;
+  cadence: BillCadence;
+  categoryId?: string;
+  active: boolean;
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  target: number;
+  saved: number;
+  by?: string; // free-text deadline
+}
+
+export interface BudgetSettings {
+  monthlyIncome?: number;
+  currencySymbol: string;
+}
+
 // ---- Account (community registration; device-local until sync ships) ----
 
 export interface Account {
