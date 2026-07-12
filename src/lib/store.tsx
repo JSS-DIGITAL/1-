@@ -51,6 +51,7 @@ import type {
   MotivationItem,
   Prefs,
   Quit,
+  RecoveryDay,
   Recurrence,
   Relapse,
   SavedExercise,
@@ -95,6 +96,7 @@ export interface Persisted {
   activityEntries: ActivityEntry[];
   activityGoals: ActivityGoals;
   savedExercises: SavedExercise[];
+  recoveryDays: RecoveryDay[];
   budgetCategories: BudgetCategory[];
   transactions: Transaction[];
   bills: Bill[];
@@ -211,6 +213,8 @@ interface AppState {
   removeActivityEntry: (id: string) => void;
   setActivityGoals: (patch: Partial<ActivityGoals>) => void;
   addSavedExercise: (ex: SavedExercise) => void;
+  recoveryDays: RecoveryDay[];
+  updateRecoveryDay: (date: string, patch: Partial<Omit<RecoveryDay, "date">>) => void;
   /** Budget (separate section; no loop/economy). */
   budgetCategories: BudgetCategory[];
   transactions: Transaction[];
@@ -285,6 +289,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([]);
   const [activityGoals, setActivityGoalsState] = useState<ActivityGoals>(DEFAULT_ACTIVITY_GOALS);
   const [savedExercises, setSavedExercises] = useState<SavedExercise[]>([]);
+  const [recoveryDays, setRecoveryDays] = useState<RecoveryDay[]>([]);
   const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>(DEFAULT_CATEGORIES);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -313,6 +318,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActivityEntries(saved.activityEntries ?? []);
     setActivityGoalsState(saved.activityGoals ?? DEFAULT_ACTIVITY_GOALS);
     setSavedExercises(saved.savedExercises ?? []);
+    setRecoveryDays(saved.recoveryDays ?? []);
     setBudgetCategories(saved.budgetCategories?.length ? saved.budgetCategories : DEFAULT_CATEGORIES);
     setTransactions(saved.transactions ?? []);
     setBills(saved.bills ?? []);
@@ -406,6 +412,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     activityEntries,
     activityGoals,
     savedExercises,
+    recoveryDays,
     budgetCategories,
     transactions,
     bills,
@@ -416,7 +423,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated || isGuest) return;
     saveStateDebounced(snapshot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, isGuest, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek, account, healthDays, healthGoals, savedFoods, quits, activityEntries, activityGoals, savedExercises, budgetCategories, transactions, bills, savingsGoals, budgetSettings]);
+  }, [hydrated, isGuest, areas, records, missions, ledger, fuel, savedFuelIds, focusLogs, prefs, accents, vault, shieldHeld, pinnedLine, weeklyDoneWeek, account, healthDays, healthGoals, savedFoods, quits, activityEntries, activityGoals, savedExercises, recoveryDays, budgetCategories, transactions, bills, savingsGoals, budgetSettings]);
 
   // ---- Health actions (separate section; loop and economy never touch it) ----
 
@@ -489,6 +496,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const key = ex.name.trim().toLowerCase();
       if (!key) return s;
       return [...s.filter((f) => f.name.trim().toLowerCase() !== key), { ...ex, name: ex.name.trim() }];
+    });
+  }, []);
+
+  const updateRecoveryDay = useCallback((date: string, patch: Partial<Omit<RecoveryDay, "date">>) => {
+    setRecoveryDays((days) => {
+      const existing = days.find((d) => d.date === date);
+      if (existing) return days.map((d) => (d.date === date ? { ...d, ...patch } : d));
+      return [...days, { date, rest: false, ...patch }];
     });
   }, []);
 
@@ -642,6 +657,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ]);
     setActivityGoalsState({ weeklyMinutes: 150, weeklySessions: 4 });
     setSavedExercises([]);
+    // Demo recovery: the gap days were deliberate rest, soreness climbing after the hard days.
+    setRecoveryDays([
+      { date: dayOffset(-4), rest: true, soreness: 3 },
+      { date: dayOffset(-2), rest: true, soreness: 2 },
+      { date: dayOffset(0), rest: false, soreness: 3 },
+    ]);
     // Demo budget: an income, a few capped categories, this month's spend, bills, a goal.
     setBudgetCategories([
       { id: "cat-rent", name: "Rent / Mortgage", kind: "expense", limit: 2200 },
@@ -698,6 +719,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActivityEntries([]);
     setActivityGoalsState(DEFAULT_ACTIVITY_GOALS);
     setSavedExercises([]);
+    setRecoveryDays([]);
     setBudgetCategories(DEFAULT_CATEGORIES);
     setTransactions([]);
     setBills([]);
@@ -727,6 +749,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (Array.isArray(d.activityEntries)) setActivityEntries(d.activityEntries);
     if (d.activityGoals) setActivityGoalsState(d.activityGoals);
     if (Array.isArray(d.savedExercises)) setSavedExercises(d.savedExercises);
+    if (Array.isArray(d.recoveryDays)) setRecoveryDays(d.recoveryDays);
     if (Array.isArray(d.budgetCategories)) setBudgetCategories(d.budgetCategories.length ? d.budgetCategories : DEFAULT_CATEGORIES);
     if (Array.isArray(d.transactions)) setTransactions(d.transactions);
     if (Array.isArray(d.bills)) setBills(d.bills);
@@ -1073,6 +1096,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     removeActivityEntry,
     setActivityGoals,
     addSavedExercise,
+    recoveryDays,
+    updateRecoveryDay,
     budgetCategories,
     transactions,
     bills,

@@ -4,10 +4,10 @@
 // carries an exercise library, sets/reps, a weekly movement goal and streaks.
 // Calorie estimates use MET values; general wellness numbers, not medical advice.
 
-import type { ActivityEntry, ActivityGoals, SavedExercise } from "./types";
+import type { ActivityEntry, ActivityGoals, HealthDay, RecoveryDay, SavedExercise } from "./types";
 import { dayOffset } from "./mock";
 
-export const ACTIVITY_CATEGORIES = ["Strength", "Cardio", "Mobility", "Sport"] as const;
+export const ACTIVITY_CATEGORIES = ["Strength", "Cardio", "Mobility", "Sport", "Recovery"] as const;
 
 /** ~40 common movements. met = metabolic equivalent (rough); kind drives logging shape. */
 export const EXERCISE_LIBRARY: SavedExercise[] = [
@@ -55,6 +55,15 @@ export const EXERCISE_LIBRARY: SavedExercise[] = [
   { name: "Netball", category: "Sport", kind: "time", met: 6 },
   { name: "Surfing", category: "Sport", kind: "time", met: 5 },
   { name: "Climbing", category: "Sport", kind: "time", met: 8 },
+  // Recovery — rest is training
+  { name: "Sauna", category: "Recovery", kind: "time", met: 1.5 },
+  { name: "Ice bath / cold plunge", category: "Recovery", kind: "time", met: 1.5 },
+  { name: "Massage / massage gun", category: "Recovery", kind: "time", met: 1.3 },
+  { name: "Nap", category: "Recovery", kind: "time", met: 1 },
+  { name: "Breathwork", category: "Recovery", kind: "time", met: 1.2 },
+  { name: "Meditation", category: "Recovery", kind: "time", met: 1 },
+  { name: "Easy walk (recovery)", category: "Recovery", kind: "time", met: 2.8 },
+  { name: "Contrast shower", category: "Recovery", kind: "time", met: 1.5 },
 ];
 
 export const DEFAULT_ACTIVITY_GOALS: ActivityGoals = { weeklyMinutes: 150, weeklySessions: 4 };
@@ -87,17 +96,94 @@ export function weeklySessions(entries: ActivityEntry[]): number {
   return days.size;
 }
 
-/** Consecutive days up to today with at least one session. */
-export function activityStreakDays(entries: ActivityEntry[]): number {
+/**
+ * Consecutive days up to today with at least one session — or a deliberately
+ * marked rest day. Rest is training: a marked rest day keeps the streak alive.
+ */
+export function activityStreakDays(entries: ActivityEntry[], recoveryDays: RecoveryDay[] = []): number {
   const days = new Set(entries.map((e) => e.date));
+  const rests = new Set(recoveryDays.filter((r) => r.rest).map((r) => r.date));
   let streak = 0;
   for (let i = 0; i < 400; i++) {
     const d = dayOffset(-i);
-    if (days.has(d)) streak++;
+    if (days.has(d) || rests.has(d)) streak++;
     else if (i === 0) continue; // today may be unlogged yet
     else break;
   }
   return streak;
+}
+
+// ---- Rest & recovery (rest is training) ----
+
+/** True when the entry is actual training, not a recovery modality. */
+function isTraining(e: ActivityEntry): boolean {
+  return e.category !== "Recovery";
+}
+
+/**
+ * Training days in a row up to today. A marked rest day — or any day without
+ * a training session — breaks the chain (that's the point of resting).
+ */
+export function consecutiveTrainingDays(entries: ActivityEntry[], recoveryDays: RecoveryDay[] = []): number {
+  const days = new Set(entries.filter(isTraining).map((e) => e.date));
+  const rests = new Set(recoveryDays.filter((r) => r.rest).map((r) => r.date));
+  let run = 0;
+  for (let i = 0; i < 60; i++) {
+    const d = dayOffset(-i);
+    if (rests.has(d)) break;
+    if (days.has(d)) run++;
+    else if (i === 0) continue; // today may be unlogged yet
+    else break;
+  }
+  return run;
+}
+
+/** Weighted 7-day training load: hard = 2, moderate = 1, easy = 0.5 per session. */
+export function trainingLoad7d(entries: ActivityEntry[]): number {
+  const week = new Set(last7Dates());
+  return entries
+    .filter((e) => week.has(e.date) && isTraining(e))
+    .reduce((s, e) => s + (e.intensity === "hard" ? 2 : e.intensity === "easy" ? 0.5 : 1), 0);
+}
+
+/** Mean logged sleep over the last 7 days; null until there are 2+ logs. */
+export function avgSleep7d(healthDays: HealthDay[]): number | null {
+  const week = new Set(last7Dates());
+  const hs = healthDays.filter((d) => week.has(d.date) && d.sleepH !== undefined).map((d) => d.sleepH as number);
+  if (hs.length < 2) return null;
+  return Math.round((hs.reduce((s, h) => s + h, 0) / hs.length) * 10) / 10;
+}
+
+/** Today's soreness, falling back to yesterday's. */
+export function latestSoreness(recoveryDays: RecoveryDay[]): number | undefined {
+  return (
+    recoveryDays.find((r) => r.date === dayOffset(0))?.soreness ??
+    recoveryDays.find((r) => r.date === dayOffset(-1))?.soreness
+  );
+}
+
+export type RecoveryLevel = "fresh" | "steady" | "rest";
+
+/**
+ * Rule-based recovery verdict. Rest advised when any strain signal fires;
+ * fresh when the load is genuinely light; steady otherwise.
+ */
+export function recoveryStatus(input: {
+  consecutive: number;
+  load: number;
+  sleepAvg: number | null;
+  soreness?: number;
+}): { level: RecoveryLevel; reasons: string[] } {
+  const reasons: string[] = [];
+  if (input.consecutive >= 4) reasons.push(`${input.consecutive} training days in a row — schedule a rest day`);
+  if (input.load >= 10) reasons.push("heavy 7-day training load");
+  if (input.soreness !== undefined && input.soreness >= 4) reasons.push("soreness is high — let it settle");
+  if (input.sleepAvg !== null && input.sleepAvg < 6) reasons.push(`avg sleep ${input.sleepAvg}h — aim for 7+`);
+  if (reasons.length > 0) return { level: "rest", reasons };
+  if (input.load <= 3 && (input.soreness ?? 1) <= 2) {
+    return { level: "fresh", reasons: ["load is light and the body feels good — train"] };
+  }
+  return { level: "steady", reasons: ["load is manageable — keep an eye on sleep and soreness"] };
 }
 
 export function minutesOnDate(entries: ActivityEntry[], date: string): number {

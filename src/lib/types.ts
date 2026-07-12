@@ -283,6 +283,16 @@ export interface SavedExercise {
   met?: number;
 }
 
+/** Rest & recovery — per-day rest marking and soreness (rest is training). */
+export interface RecoveryDay {
+  date: string;
+  /** Deliberately marked rest day; keeps the activity streak alive. */
+  rest: boolean;
+  /** 1 fresh … 5 wrecked. */
+  soreness?: number;
+  note?: string;
+}
+
 // ---- Budget (manual money tracker; separate section — no loop/economy) ----
 // Real dollars, device-local, no bank sync. Accent + neutrals only — gold stays
 // reserved for the bp economy so the two money systems never blur. Not advice.
